@@ -1,0 +1,76 @@
+/*
+  Bits Box prototype styling
+  Inspired by Candy Box 2's very simple centered monospace layout,
+  but written from scratch for your own game.
+*/
+
+body {
+  margin: 0;
+  overflow-y: scroll;
+  text-align: center;
+  background: #ffffff;
+  color: #111111;
+}
+
+pre {
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 1em;
+  line-height: 1.2;
+}
+
+#aroundStatusBar {
+  z-index: 100;
+}
+
+#statusBar {
+  margin: 0 auto;
+  margin-top: 0;
+  margin-bottom: 0;
+  display: inline-block;
+  min-height: 1.2em;
+  background-color: #ffffff;
+}
+
+#mainContent {
+  margin: 0 auto;
+  margin-top: 0;
+  margin-bottom: 0;
+  display: inline-block;
+  text-align: left;
+  min-width: 640px;
+}
+
+#versionNumber {
+  position: fixed;
+  bottom: 0;
+  left: 10px;
+  font-size: 10px;
+}
+
+.asciiButton {
+  cursor: pointer;
+  user-select: none;
+  color: #000000;
+  text-decoration: underline;
+}
+
+.asciiButton:hover {
+  background-color: #eeeeee;
+}
+
+.asciiRealButton {
+  cursor: pointer;
+  user-select: none;
+  border: 1px solid #464c54;
+  background-color: #dcdad5;
+  padding: 1px 6px;
+  font-family: Consolas, "Courier New", monospace;
+}
+
+.asciiRealButton:hover {
+  background-color: #eeebe7;
+}
+
+.hidden {
+  display: none;
+}
