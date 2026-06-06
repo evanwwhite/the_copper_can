@@ -1,5 +1,5 @@
 import { game } from "./gameState.js";
-import { BENT_MAGNET_COST, FREE_WILL_COST } from "./data.js";
+import { BEEHIVE_UNLOCK_AMOUNT, BENT_MAGNET_COST, FREE_WILL_COST } from "./data.js";
 import { saveGame, clearSave } from "./saveSystem.js";
 
 async function renderGame() {
@@ -59,6 +59,7 @@ export async function startNewGame() {
   game.hasCopperCan = false;
   game.hasBentMagnet = false;
   game.hasInvestigatedMagnet = false;
+  game.hasDisturbedBeehive = false;
   game.bentMagnetBitsPerSecond = 1;
 
   game.hasUnlockedCopperCan = false;
@@ -188,7 +189,22 @@ export async function buyBentMagnet() {
   await renderGame();
 }
 
+export async function disturbBeehive() {
+  if (!game.hasBentMagnet) return;
+  if (game.copperBits < BEEHIVE_UNLOCK_AMOUNT) return;
+  if (game.hasDisturbedBeehive) return;
+
+  game.hasDisturbedBeehive = true;
+  game.lastMessage =
+    "You were obviously stung, but luckily it wasn't enough to do damage.";
+
+  saveGame();
+  await renderGame();
+}
+
 export async function unlockMap() {
+  if (!game.hasDisturbedBeehive) return;
+
   game.hasUnlockedMap = true;
   game.currentView = "map";
   game.lastMessage = "You found the shape of the forest.";
@@ -249,6 +265,7 @@ export async function resetPrototype() {
   game.hasCopperCan = false;
   game.hasBentMagnet = false;
   game.hasInvestigatedMagnet = false;
+  game.hasDisturbedBeehive = false;
   game.bentMagnetBitsPerSecond = 1;
 
   game.hasUnlockedCopperCan = false;

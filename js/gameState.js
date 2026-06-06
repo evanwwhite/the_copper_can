@@ -14,6 +14,7 @@ export const game = {
   hasCopperCan: false,
   hasBentMagnet: false,
   hasInvestigatedMagnet: false,
+  hasDisturbedBeehive: false,
   bentMagnetBitsPerSecond: 1,
 
   hasUnlockedCopperCan: false,

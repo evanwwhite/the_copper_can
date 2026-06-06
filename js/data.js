@@ -1,4 +1,5 @@
-export const BENT_MAGNET_COST = 20;
+export const BENT_MAGNET_COST = 15;
+export const BEEHIVE_UNLOCK_AMOUNT = 20;
 export const MAP_UNLOCK_AMOUNT = 35;
 export const FREE_WILL_COST = 10;
 export const SAVE_KEY = "bitsBoxPrototypeSave";

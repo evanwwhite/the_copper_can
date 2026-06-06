@@ -18,6 +18,7 @@ export function saveGame() {
     hasCopperCan: game.hasCopperCan,
     hasBentMagnet: game.hasBentMagnet,
     hasInvestigatedMagnet: game.hasInvestigatedMagnet,
+    hasDisturbedBeehive: game.hasDisturbedBeehive,
     bentMagnetBitsPerSecond: game.bentMagnetBitsPerSecond,
 
     hasUnlockedCopperCan: game.hasUnlockedCopperCan,
@@ -61,6 +62,7 @@ export function loadGame() {
     game.hasCopperCan = saveData.hasCopperCan ?? false;
     game.hasBentMagnet = saveData.hasBentMagnet ?? false;
     game.hasInvestigatedMagnet = saveData.hasInvestigatedMagnet ?? false;
+    game.hasDisturbedBeehive = saveData.hasDisturbedBeehive ?? false;
     game.bentMagnetBitsPerSecond = saveData.bentMagnetBitsPerSecond ?? 1;
 
     game.hasUnlockedCopperCan = saveData.hasUnlockedCopperCan ?? false;
