@@ -2,12 +2,28 @@ import { game, statusBar, mainContent } from "./gameState.js";
 import {
   BENT_MAGNET_COST,
   BEEHIVE_UNLOCK_AMOUNT,
+  COMBAT_ARENA_HEIGHT,
+  COMBAT_ARENA_WIDTH,
   MAP_UNLOCK_AMOUNT,
   FREE_WILL_COST,
+  combatEnemies,
   thoughts,
 } from "./data.js";
-import { introTitleArt, bitsBoxTitleArt, mapLines } from "./asciiArt.js";
-import { BOX_TEXT_WIDTH, centerText, makeBox, wrapText } from "./helpers.js";
+import {
+  darkTreeWatcherDeadArt,
+  darkTreeWatcherArt,
+  copperCanTitleArt,
+  introTitleArt,
+  mapLines,
+  playerCombatArt,
+} from "./asciiArt.js";
+import {
+  BOX_TEXT_WIDTH,
+  centerText,
+  makeBox,
+  makePreformattedBox,
+  wrapText,
+} from "./helpers.js";
 import { saveGame } from "./saveSystem.js";
 
 import {
@@ -24,6 +40,8 @@ import {
   unlockMap,
   visitCopperCan,
   visitDarkTrees,
+  startDarkTreeFight,
+  exitCombat,
   manualSave,
   resetPrototype,
 } from "./actions.js";
@@ -31,6 +49,7 @@ import {
 export function renderIntroScreen() {
   game.screen = "intro";
   saveGame();
+  setMainContentMode();
 
   statusBar.textContent = "";
 
@@ -62,7 +81,9 @@ ${introTitleArt}
 export function renderGameScreen() {
   renderTopBar();
 
-  if (game.currentView === "map" && game.hasUnlockedMap) {
+  if (game.currentView === "combat" && game.combat.active) {
+    renderCombatView();
+  } else if (game.currentView === "map" && game.hasUnlockedMap) {
     renderMapView();
   } else if (game.currentView === "pack" && game.hasUnlockedPack) {
     renderPackView();
@@ -110,11 +131,76 @@ function makeHealthBar(current, max, width) {
   return "■".repeat(filledAmount) + "□".repeat(emptyAmount);
 }
 
+function setMainContentMode(modeName = "") {
+  mainContent.className = modeName;
+}
+
+function placeSprite(canvas, spriteLines, x, y) {
+  spriteLines.forEach((line, rowOffset) => {
+    [...line].forEach((character, columnOffset) => {
+      const rowIndex = y + rowOffset;
+      const columnIndex = x + columnOffset;
+
+      if (
+        character === " " ||
+        rowIndex < 0 ||
+        rowIndex >= canvas.length ||
+        columnIndex < 0 ||
+        columnIndex >= canvas[0].length
+      ) {
+        return;
+      }
+
+      canvas[rowIndex][columnIndex] = character;
+    });
+  });
+}
+
+function getSpriteWidth(spriteLines) {
+  return spriteLines.reduce((maximumWidth, line) => {
+    return Math.max(maximumWidth, line.length);
+  }, 0);
+}
+
+function getCombatEnemyArt() {
+  if (game.combat.canExit || game.combat.enemyHp === 0) {
+    return darkTreeWatcherDeadArt;
+  }
+
+  return darkTreeWatcherArt;
+}
+
+function buildCombatArenaLines() {
+  const canvas = Array.from({ length: COMBAT_ARENA_HEIGHT }, () =>
+    Array.from({ length: COMBAT_ARENA_WIDTH }, () => " "),
+  );
+
+  const floorRow = COMBAT_ARENA_HEIGHT - 2;
+
+  for (let column = 0; column < COMBAT_ARENA_WIDTH; column += 1) {
+    canvas[floorRow][column] = "_";
+  }
+
+  const playerY = floorRow - playerCombatArt.length + 1;
+  const enemyArt = getCombatEnemyArt();
+  const enemyY = floorRow - enemyArt.length + 1;
+  const liveEnemyWidth = getSpriteWidth(darkTreeWatcherArt);
+  const enemyWidth = getSpriteWidth(enemyArt);
+  const enemyX = game.combat.enemyX + (liveEnemyWidth - enemyWidth);
+
+  placeSprite(canvas, playerCombatArt, game.combat.playerX, playerY);
+  placeSprite(canvas, enemyArt, enemyX, enemyY);
+
+  return canvas.map((row) => row.join(""));
+}
+
 export function renderTopBar() {
   if (game.screen !== "game") {
     statusBar.textContent = "";
     return;
   }
+
+  const showHealthBar = game.hasDisturbedBeehive || game.combat.active;
 
   let currencyText = `${game.copperBits}c`;
 
@@ -212,17 +298,17 @@ export function renderTopBar() {
   const bottomBorder = "└" + "─".repeat(topInnerWidth) + "┘";
 
   const healthText = `${game.health}/${game.maxHealth}`;
-  const healthPrefix = game.hasDisturbedBeehive
+  const healthPrefix = showHealthBar
     ? " ♥ HEALTH  ["
     : " ♥ ??????  [";
-  const healthSuffix = game.hasDisturbedBeehive
+  const healthSuffix = showHealthBar
     ? `] ${healthText} `
     : "]       ";
 
   const healthBarWidth =
     topInnerWidth - healthPrefix.length - healthSuffix.length;
 
-  const healthBar = game.hasDisturbedBeehive
+  const healthBar = showHealthBar
     ? makeHealthBar(game.health, game.maxHealth, healthBarWidth)
     : " ".repeat(Math.max(healthBarWidth, 0));
 
@@ -238,6 +324,10 @@ ${bottomBorder}
 }
 
 export function attachTopBarListeners() {
+  if (game.combat.active) {
+    return;
+  }
+
   const mapTab = document.getElementById("mapTab");
   if (mapTab) {
     mapTab.addEventListener("click", () => switchView("map"));
@@ -270,6 +360,7 @@ export function attachTopBarListeners() {
 }
 
 export function renderCopperCanView() {
+  setMainContentMode();
   const canLines = [`Copper bits: ${game.copperBits}`];
 
   if (game.hasUnlockedSilverBits) {
@@ -472,12 +563,18 @@ ${makeBox("MESSAGE", [game.lastMessage])}
 }
 
 export function renderMapView() {
+  setMainContentMode();
   mainContent.innerHTML = `
-${makeBox("MAP", mapLines)}
+${makePreformattedBox("MAP", mapLines)}
 
 
     <span id="visitCopperCanButton" class="asciiRealButton">Visit the copper can</span>
+
+
     <span id="visitDarkTreesButton" class="asciiRealButton">Step toward the dark trees</span>
+    
+
+    <span id="fightDarkTreesButton" class="asciiRealButton">Fight</span>
 
 `;
 
@@ -487,9 +584,13 @@ ${makeBox("MAP", mapLines)}
   document
     .getElementById("visitDarkTreesButton")
     .addEventListener("click", visitDarkTrees);
+  document
+    .getElementById("fightDarkTreesButton")
+    .addEventListener("click", startDarkTreeFight);
 }
 
 export function renderPackView() {
+  setMainContentMode();
   const magnetText = game.hasBentMagnet ? "Bent magnet" : "Nothing useful yet";
 
   mainContent.innerHTML = `
@@ -512,6 +613,7 @@ ${makeBox("PACK", [
 }
 
 export function renderThoughtsView() {
+  setMainContentMode();
   const unlockedThoughts = thoughts.filter((thought) =>
     thought.isUnlocked(game),
   );
@@ -540,6 +642,7 @@ ${makeBox("THOUGHTS", thoughtLines)}
 }
 
 export function renderSaveView() {
+  setMainContentMode();
   mainContent.innerHTML = `
 ${makeBox("SAVE", [
   "The forest remembers you automatically.",
@@ -559,6 +662,7 @@ ${makeBox("SAVE", [
 }
 
 export function renderSettingsView() {
+  setMainContentMode();
   mainContent.innerHTML = `
 ${makeBox("SETTINGS", [
   "There are not many settings yet.",
@@ -576,17 +680,64 @@ ${makeBox("SETTINGS", [
     .addEventListener("click", resetPrototype);
 }
 
+export function renderCombatView() {
+  setMainContentMode("combatView");
+
+  const enemy = combatEnemies[game.combat.enemyId];
+
+  if (!enemy) {
+    mainContent.innerHTML = "";
+    return;
+  }
+
+  const phaseLabel = game.combat.canExit
+    ? "Victory"
+    : game.combat.phase === "approach"
+      ? "Approach"
+      : "Clash";
+
+  const combatLines = [
+    `Enemy: ${enemy.name}`,
+    `Phase: ${phaseLabel}`,
+    `Enemy health: ${game.combat.enemyHp}/${game.combat.enemyMaxHp}`,
+    "",
+    ...buildCombatArenaLines(),
+    "",
+    ...wrapText(game.combat.message, COMBAT_ARENA_WIDTH),
+  ];
+
+  let content = `
+${makePreformattedBox("FIGHT", combatLines, COMBAT_ARENA_WIDTH)}
+`;
+
+  if (game.combat.canExit) {
+    content += `
+
+    <span id="exitCombatButton" class="asciiRealButton">Exit fight</span>
+
+`;
+  }
+
+  mainContent.innerHTML = content;
+
+  const exitCombatButton = document.getElementById("exitCombatButton");
+  if (exitCombatButton) {
+    exitCombatButton.addEventListener("click", exitCombat);
+  }
+}
+
 export function renderTitleRevealScreen() {
   game.screen = "titleReveal";
   game.hasSeenTitleReveal = true;
   saveGame();
+  setMainContentMode();
 
   statusBar.textContent = "";
 
   mainContent.innerHTML = String.raw`
 
 
-${bitsBoxTitleArt}
+${copperCanTitleArt}
 
                          The can, the magnet, the map...
 
@@ -595,7 +746,7 @@ ${bitsBoxTitleArt}
                          They were the beginning of something.
 
 
-                         BITS BOX
+                      THE COPPER CAN
 
 
                                       <span id="continueButton" class="asciiRealButton">Continue</span>

@@ -1,5 +1,5 @@
 /*
-  Bits Box prototype styling
+  The Copper Can prototype styling
   Inspired by Candy Box 2's very simple centered monospace layout,
   but written from scratch for your own game.
 */
@@ -38,6 +38,10 @@ pre {
   display: inline-block;
   text-align: left;
   min-width: 640px;
+}
+
+#mainContent.combatView {
+  min-width: 900px;
 }
 
 #versionNumber {

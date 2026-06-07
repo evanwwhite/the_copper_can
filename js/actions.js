@@ -1,5 +1,14 @@
-import { game } from "./gameState.js";
-import { BEEHIVE_UNLOCK_AMOUNT, BENT_MAGNET_COST, FREE_WILL_COST } from "./data.js";
+import { createCombatState, game } from "./gameState.js";
+import {
+  BEEHIVE_UNLOCK_AMOUNT,
+  BENT_MAGNET_COST,
+  COMBAT_ARENA_WIDTH,
+  COMBAT_MOVE_STEP,
+  COMBAT_PLAYER_DAMAGE,
+  COMBAT_TICK_MS,
+  FREE_WILL_COST,
+  combatEnemies,
+} from "./data.js";
 import { saveGame, clearSave } from "./saveSystem.js";
 
 async function renderGame() {
@@ -27,6 +36,150 @@ async function renderTitleReveal() {
   renderTitleRevealScreen();
 }
 
+function getCombatEnemy() {
+  if (!game.combat.enemyId) return null;
+  return combatEnemies[game.combat.enemyId] ?? null;
+}
+
+function clearCombatTimer() {
+  if (game.combatTimerId === null) return;
+
+  window.clearInterval(game.combatTimerId);
+  game.combatTimerId = null;
+}
+
+function resetCombatState() {
+  clearCombatTimer();
+  game.combat = createCombatState();
+}
+
+function resolveApproachPhase(enemy) {
+  const approach = enemy.approach ?? {};
+  const mover = approach.mover === "enemy" ? "enemy" : "player";
+  const direction = approach.direction ?? (mover === "enemy" ? "left" : "right");
+  const step = Math.max(1, approach.step ?? COMBAT_MOVE_STEP);
+  const supportStep = Math.max(0, approach.supportStep ?? 0);
+  const stopDistance = Math.max(1, approach.stopDistance ?? 8);
+
+  if (mover === "enemy") {
+    if (direction === "right") {
+      const currentGap = game.combat.playerX - game.combat.enemyX;
+
+      if (currentGap <= stopDistance) return true;
+
+      let closableDistance = currentGap - stopDistance;
+      const enemyMove = Math.min(step, closableDistance);
+      closableDistance -= enemyMove;
+      const playerMove = Math.min(supportStep, closableDistance);
+
+      game.combat.enemyX += enemyMove;
+      game.combat.playerX -= playerMove;
+
+      return game.combat.playerX - game.combat.enemyX <= stopDistance;
+    }
+
+    const currentGap = game.combat.enemyX - game.combat.playerX;
+
+    if (currentGap <= stopDistance) return true;
+
+    let closableDistance = currentGap - stopDistance;
+    const enemyMove = Math.min(step, closableDistance);
+    closableDistance -= enemyMove;
+    const playerMove = Math.min(supportStep, closableDistance);
+
+    game.combat.enemyX -= enemyMove;
+    game.combat.playerX += playerMove;
+
+    return game.combat.enemyX - game.combat.playerX <= stopDistance;
+  }
+
+  if (direction === "left") {
+    const currentGap = game.combat.playerX - game.combat.enemyX;
+
+    if (currentGap <= stopDistance) return true;
+
+    let closableDistance = currentGap - stopDistance;
+    const playerMove = Math.min(step, closableDistance);
+    closableDistance -= playerMove;
+    const enemyMove = Math.min(supportStep, closableDistance);
+
+    game.combat.playerX -= playerMove;
+    game.combat.enemyX += enemyMove;
+
+    return game.combat.playerX - game.combat.enemyX <= stopDistance;
+  }
+
+  const currentGap = game.combat.enemyX - game.combat.playerX;
+
+  if (currentGap <= stopDistance) return true;
+
+  let closableDistance = currentGap - stopDistance;
+  const playerMove = Math.min(step, closableDistance);
+  closableDistance -= playerMove;
+  const enemyMove = Math.min(supportStep, closableDistance);
+
+  game.combat.playerX += playerMove;
+  game.combat.enemyX -= enemyMove;
+
+  return game.combat.enemyX - game.combat.playerX <= stopDistance;
+}
+
+async function resolveCombatTick() {
+  const enemy = getCombatEnemy();
+
+  if (!game.combat.active || !enemy) {
+    resetCombatState();
+    saveGame();
+    await renderGame();
+    return;
+  }
+
+  if (game.combat.phase === "approach") {
+    game.combat.message = enemy.approachText;
+
+    if (resolveApproachPhase(enemy)) {
+      game.combat.phase = "attack";
+      game.combat.message = enemy.attackText;
+    }
+  } else if (game.combat.phase === "attack") {
+    game.combat.enemyHp = Math.max(
+      0,
+      game.combat.enemyHp - COMBAT_PLAYER_DAMAGE,
+    );
+
+    if (game.combat.enemyHp === 0) {
+      clearCombatTimer();
+      game.combat.phase = "victory";
+      game.combat.canExit = true;
+      game.combat.rewardCopperBits = enemy.rewardCopperBits;
+      game.copperBits += enemy.rewardCopperBits;
+      game.lastMessage =
+        `${enemy.victoryText} You recover ${enemy.rewardCopperBits} copper bits.`;
+      game.combat.message = "The path out of the fight is clear now.";
+    } else {
+      game.health = Math.max(0, game.health - enemy.attackDamage);
+
+      game.combat.message =
+        `${enemy.attackText} You take ${enemy.attackDamage} damage. ` +
+        `${game.combat.enemyHp} enemy health remains. ` +
+        `Your health is now ${game.health}/${game.maxHealth}.`;
+    }
+  }
+
+  saveGame();
+  await renderGame();
+}
+
+function startCombatLoop() {
+  if (game.combatTimerId !== null) return;
+
+  game.combatTimerId = window.setInterval(() => {
+    resolveCombatTick().catch(() => {
+      clearCombatTimer();
+    });
+  }, COMBAT_TICK_MS);
+}
+
 export function startTimer() {
   if (game.timerId !== null) return;
 
@@ -44,6 +197,7 @@ export function startTimer() {
 }
 
 export async function startNewGame() {
+  resetCombatState();
   game.screen = "game";
   game.currentView = "can";
 
@@ -85,10 +239,22 @@ export async function continueGame() {
   game.screen = "game";
   saveGame();
   startTimer();
+
+  if (game.combat.active) {
+    startCombatLoop();
+  }
+
   await renderGame();
 }
 
 export async function switchView(viewName) {
+  if (game.combat.active && viewName !== "combat") {
+    game.combat.message = "Finish the fight before leaving the arena.";
+    saveGame();
+    await renderGame();
+    return;
+  }
+
   game.currentView = viewName;
   saveGame();
   await renderGame();
@@ -241,6 +407,42 @@ export async function visitDarkTrees() {
   await renderMap();
 }
 
+export async function startDarkTreeFight() {
+  if (game.combat.active) return;
+
+  const enemy = combatEnemies.darkTreeWatcher;
+
+  game.currentView = "combat";
+  game.combat = {
+    ...createCombatState(),
+    active: true,
+    phase: "approach",
+    enemyId: enemy.id,
+    enemyHp: enemy.maxHealth,
+    enemyMaxHp: enemy.maxHealth,
+    playerX: 2,
+    enemyX: COMBAT_ARENA_WIDTH - 12,
+    returnView: "map",
+    message: enemy.introText,
+  };
+
+  saveGame();
+  startCombatLoop();
+  await renderGame();
+}
+
+export async function exitCombat() {
+  if (!game.combat.canExit) return;
+
+  const returnView = game.combat.returnView || "map";
+
+  resetCombatState();
+  game.currentView = returnView;
+
+  saveGame();
+  await renderGame();
+}
+
 export async function manualSave() {
   game.lastMessage = "Saved.";
   saveGame();
@@ -249,6 +451,7 @@ export async function manualSave() {
 
 export async function resetPrototype() {
   clearSave();
+  resetCombatState();
 
   game.screen = "intro";
   game.currentView = "can";

@@ -1,5 +1,5 @@
-import { game } from "./gameState.js";
-import { SAVE_KEY } from "./data.js";
+import { createCombatState, game } from "./gameState.js";
+import { LEGACY_SAVE_KEYS, SAVE_KEY } from "./data.js";
 
 export function saveGame() {
   const saveData = {
@@ -34,13 +34,38 @@ export function saveGame() {
     hasIgnoredCopperCan: game.hasIgnoredCopperCan,
 
     lastMessage: game.lastMessage,
+    combat: game.combat,
   };
 
   localStorage.setItem(SAVE_KEY, JSON.stringify(saveData));
+
+  LEGACY_SAVE_KEYS.forEach((legacyKey) => {
+    if (legacyKey !== SAVE_KEY) {
+      localStorage.removeItem(legacyKey);
+    }
+  });
+}
+
+function getStoredSave() {
+  const primarySave = localStorage.getItem(SAVE_KEY);
+
+  if (primarySave) {
+    return primarySave;
+  }
+
+  for (const legacyKey of LEGACY_SAVE_KEYS) {
+    const legacySave = localStorage.getItem(legacyKey);
+
+    if (legacySave) {
+      return legacySave;
+    }
+  }
+
+  return null;
 }
 
 export function loadGame() {
-  const rawSave = localStorage.getItem(SAVE_KEY);
+  const rawSave = getStoredSave();
 
   if (!rawSave) return;
 
@@ -78,6 +103,14 @@ export function loadGame() {
     game.hasIgnoredCopperCan = saveData.hasIgnoredCopperCan ?? false;
 
     game.lastMessage = saveData.lastMessage ?? "";
+    game.combat = {
+      ...createCombatState(),
+      ...(saveData.combat ?? {}),
+    };
+
+    if (game.currentView === "combat" && !game.combat.active) {
+      game.currentView = game.combat.returnView ?? "map";
+    }
   } catch {
     localStorage.removeItem(SAVE_KEY);
   }
@@ -85,4 +118,10 @@ export function loadGame() {
 
 export function clearSave() {
   localStorage.removeItem(SAVE_KEY);
+
+  LEGACY_SAVE_KEYS.forEach((legacyKey) => {
+    if (legacyKey !== SAVE_KEY) {
+      localStorage.removeItem(legacyKey);
+    }
+  });
 }

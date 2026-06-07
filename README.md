@@ -1,6 +1,6 @@
-# Bits Box Prototype
+# The Copper Can Prototype
 
-Bits Box is a browser-based text adventure / incremental prototype built with plain HTML, CSS, and modular JavaScript. The presentation is intentionally minimal: the UI is rendered into `<pre>` blocks, ASCII art sets the tone, and player progression is driven by small state changes that unlock new views, choices, and story beats.
+The Copper Can is a browser-based text adventure / incremental prototype built with plain HTML, CSS, and modular JavaScript. The presentation is intentionally minimal: the UI is rendered into `<pre>` blocks, ASCII art sets the tone, and player progression is driven by small state changes that unlock new views, choices, and story beats.
 
 The current codebase is no longer a single-file prototype. The live game now runs from the modular files in `js/`, while `file_dump/` contains archive and reference copies from earlier or exported versions of the project.
 
@@ -17,7 +17,7 @@ The player begins on an intro screen, enters the forest, and starts collecting c
 7. At 35 copper bits with the magnet, the Map unlocks.
 8. Once Thoughts, Pack, and Map are all unlocked, the title reveal sequence can trigger.
 
-Progress is saved in `localStorage` under the key `bitsBoxPrototypeSave`.
+Progress is saved in `localStorage` under the key `theCopperCanPrototypeSave`. Older `bitsBoxPrototypeSave` data is still loaded and migrated forward automatically.
 
 ## How it runs
 
@@ -162,7 +162,7 @@ Most prototype tuning lives in `js/data.js`.
 export const BENT_MAGNET_COST = 20;
 export const MAP_UNLOCK_AMOUNT = 35;
 export const FREE_WILL_COST = 10;
-export const SAVE_KEY = "bitsBoxPrototypeSave";
+export const SAVE_KEY = "theCopperCanPrototypeSave";
 ```
 
 Useful gameplay behavior also depends on state defaults in `js/gameState.js` and reset/start values in `js/actions.js`.

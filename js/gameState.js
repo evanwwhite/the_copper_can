@@ -1,3 +1,19 @@
+export function createCombatState() {
+  return {
+    active: false,
+    phase: "idle",
+    enemyId: null,
+    enemyHp: 0,
+    enemyMaxHp: 0,
+    playerX: 2,
+    enemyX: 58,
+    canExit: false,
+    returnView: "map",
+    message: "",
+    rewardCopperBits: 0,
+  };
+}
+
 export const game = {
   screen: "intro",
   currentView: "can",
@@ -31,6 +47,8 @@ export const game = {
 
   lastMessage: "",
   timerId: null,
+  combatTimerId: null,
+  combat: createCombatState(),
 };
 
 export const statusBar = document.getElementById("statusBar");
