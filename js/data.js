@@ -10,24 +10,6 @@ export const COMBAT_TICK_MS = 180;
 export const COMBAT_MOVE_STEP = 2;
 export const COMBAT_PLAYER_DAMAGE = 2;
 
-export const items = {
-  copperCan: {
-    id: "copperCan",
-    name: "Copper Can",
-    description: "A small oxidized copper can.",
-  },
-
-  bentMagnet: {
-    id: "bentMagnet",
-    name: "Bent Magnet",
-    description: "It's weak, rusty, and slightly rude.",
-    cost: {
-      copperBits: BENT_MAGNET_COST,
-    },
-    copperBitsPerSecond: 1,
-  },
-};
-
 export const thoughts = [
   {
     id: "refusedBit",
@@ -47,48 +29,34 @@ export const thoughts = [
   {
     id: "copperBitsMatter",
     text: "Copper bits matter. Probably.",
-    isUnlocked: game => game.hasUnlockedCopperCan,
+    isUnlocked: game => game.unlocks.copperCan,
   },
   {
     id: "throwingBits",
     text: "Throwing bits away is possible. That feels important.",
-    isUnlocked: game => game.copperBits >= 3,
+    isUnlocked: game => game.currencies.copper >= 3,
   },
   {
     id: "buriedMagnet",
     text: "Something was buried near the can.",
-    isUnlocked: game => game.hasInvestigatedMagnet,
+    isUnlocked: game => game.flags.investigatedMagnet,
   },
   {
     id: "bentMagnetPulls",
     text: "The bent magnet pulls bits toward you.",
-    isUnlocked: game => game.hasBentMagnet,
+    isUnlocked: game => game.inventory.bentMagnet,
   },
   {
     id: "forestPlaces",
     text: "The forest has places. Places mean choices.",
-    isUnlocked: game => game.hasUnlockedMap,
+    isUnlocked: game => game.flags.reachedWoodedPath,
   },
 ];
-
-export const locations = {
-  copperCan: {
-    id: "copperCan",
-    name: "Copper Can",
-    description: "The place where the bits began.",
-  },
-
-  darkTrees: {
-    id: "darkTrees",
-    name: "Dark Trees",
-    description: "The dark trees do not move, but they notice you.",
-  },
-};
 
 export const combatEnemies = {
   darkTreeWatcher: {
     id: "darkTreeWatcher",
-    name: "Dark Tree Watcher",
+    name: "Rusty Iron Sign",
     maxHealth: 10,
     attackDamage: 1,
     rewardCopperBits: 6,
@@ -99,9 +67,9 @@ export const combatEnemies = {
       supportStep: COMBAT_MOVE_STEP,
       stopDistance: 8,
     },
-    introText: "Something slender unhooks itself from the trees.",
-    approachText: "It lurches left through the brush and closes the gap.",
-    attackText: "You swing first. Bark and dust shake loose.",
-    victoryText: "The watcher buckles and the trees go still again.",
+    introText: "The old sign groans as the magnet drags you closer.",
+    approachText: "It scrapes left through the dirt and closes the gap.",
+    attackText: "You swing first. Rust and dust shake loose.",
+    victoryText: "The sign buckles, and the magnet finally goes still.",
   },
 };

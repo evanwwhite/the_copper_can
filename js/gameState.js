@@ -14,42 +14,71 @@ export function createCombatState() {
   };
 }
 
-export const game = {
-  screen: "intro",
-  currentView: "can",
+export const SAVE_VERSION = 2;
 
-  copperBits: 0,
-  silverBits: 0,
-  goldBits: 0,
-  hasUnlockedSilverBits: false,
-  hasUnlockedGoldBits: false,
+export function createInitialGameState() {
+  return {
+    saveVersion: SAVE_VERSION,
 
-  health: 10,
-  maxHealth: 10,
+    world: {
+      screen: "intro",
+      currentView: "can",
+      nextScreenAfterTitleReveal: null,
+    },
 
-  hasCopperCan: false,
-  hasBentMagnet: false,
-  hasInvestigatedMagnet: false,
-  hasDisturbedBeehive: false,
-  bentMagnetBitsPerSecond: 1,
+    currencies: {
+      copper: 0,
+      silver: 0,
+      gold: 0,
+    },
 
-  hasUnlockedCopperCan: false,
-  hasUnlockedPack: false,
-  hasUnlockedThoughts: false,
-  hasUnlockedMap: false,
-  hasUnlockedSave: false,
-  hasUnlockedSettings: false,
+    player: {
+      health: 10,
+      maxHealth: 10,
+    },
 
-  hasSeenTitleReveal: false,
+    inventory: {
+      copperCan: false,
+      bentMagnet: false,
+      bentMagnetBitsPerSecond: 1,
+    },
 
-  hasRefusedCopperCan: false,
-  hasIgnoredCopperCan: false,
+    unlocks: {
+      copperCan: false,
+      pack: false,
+      thoughts: false,
+      map: false,
+      save: false,
+      settings: false,
+      silverBits: false,
+      goldBits: false,
+    },
 
-  lastMessage: "",
+    flags: {
+      investigatedMagnet: false,
+      disturbedBeehive: false,
+      reachedWoodedPath: false,
+      seenTitleReveal: false,
+      refusedCopperCan: false,
+      ignoredCopperCan: false,
+    },
+
+    lastMessage: "",
+    combat: createCombatState(),
+  };
+}
+
+export const game = createInitialGameState();
+
+export const runtime = {
   timerId: null,
   combatTimerId: null,
-  combat: createCombatState(),
+  statusBar:
+    typeof document === "undefined"
+      ? null
+      : document.getElementById("statusBar"),
+  mainContent:
+    typeof document === "undefined"
+      ? null
+      : document.getElementById("mainContent"),
 };
-
-export const statusBar = document.getElementById("statusBar");
-export const mainContent = document.getElementById("mainContent");

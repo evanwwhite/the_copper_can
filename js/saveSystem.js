@@ -1,41 +1,115 @@
-import { createCombatState, game } from "./gameState.js";
+import {
+  createCombatState,
+  createInitialGameState,
+  game,
+  SAVE_VERSION,
+} from "./gameState.js";
 import { LEGACY_SAVE_KEYS, SAVE_KEY } from "./data.js";
 
-export function saveGame() {
-  const saveData = {
-    screen: game.screen,
-    currentView: game.currentView,
+const SAVE_GROUP_KEYS = [
+  "world",
+  "currencies",
+  "player",
+  "inventory",
+  "unlocks",
+  "flags",
+];
 
-    copperBits: game.copperBits,
-    silverBits: game.silverBits,
-    goldBits: game.goldBits,
-    hasUnlockedSilverBits: game.hasUnlockedSilverBits,
-    hasUnlockedGoldBits: game.hasUnlockedGoldBits,
+function mergeDefined(defaults, values = {}) {
+  const mergedValues = { ...defaults };
 
-    health: game.health,
-    maxHealth: game.maxHealth,
+  Object.entries(values).forEach(([key, value]) => {
+    if (value !== undefined) {
+      mergedValues[key] = value;
+    }
+  });
 
-    hasCopperCan: game.hasCopperCan,
-    hasBentMagnet: game.hasBentMagnet,
-    hasInvestigatedMagnet: game.hasInvestigatedMagnet,
-    hasDisturbedBeehive: game.hasDisturbedBeehive,
-    bentMagnetBitsPerSecond: game.bentMagnetBitsPerSecond,
+  return mergedValues;
+}
 
-    hasUnlockedCopperCan: game.hasUnlockedCopperCan,
-    hasUnlockedPack: game.hasUnlockedPack,
-    hasUnlockedThoughts: game.hasUnlockedThoughts,
-    hasUnlockedMap: game.hasUnlockedMap,
-    hasUnlockedSave: game.hasUnlockedSave,
-    hasUnlockedSettings: game.hasUnlockedSettings,
+function migrateLegacySaveData(saveData) {
+  if (SAVE_GROUP_KEYS.some((key) => saveData[key])) {
+    return saveData;
+  }
 
-    hasSeenTitleReveal: game.hasSeenTitleReveal,
-
-    hasRefusedCopperCan: game.hasRefusedCopperCan,
-    hasIgnoredCopperCan: game.hasIgnoredCopperCan,
-
-    lastMessage: game.lastMessage,
-    combat: game.combat,
+  return {
+    saveVersion: SAVE_VERSION,
+    world: {
+      screen: saveData.screen,
+      currentView: saveData.currentView,
+      nextScreenAfterTitleReveal: saveData.nextScreenAfterTitleReveal,
+    },
+    currencies: {
+      copper: saveData.copperBits,
+      silver: saveData.silverBits,
+      gold: saveData.goldBits,
+    },
+    player: {
+      health: saveData.health,
+      maxHealth: saveData.maxHealth,
+    },
+    inventory: {
+      copperCan: saveData.hasCopperCan,
+      bentMagnet: saveData.hasBentMagnet,
+      bentMagnetBitsPerSecond: saveData.bentMagnetBitsPerSecond,
+    },
+    unlocks: {
+      copperCan: saveData.hasUnlockedCopperCan,
+      pack: saveData.hasUnlockedPack,
+      thoughts: saveData.hasUnlockedThoughts,
+      map: saveData.hasUnlockedMap,
+      save: saveData.hasUnlockedSave,
+      settings: saveData.hasUnlockedSettings,
+      silverBits: saveData.hasUnlockedSilverBits,
+      goldBits: saveData.hasUnlockedGoldBits,
+    },
+    flags: {
+      investigatedMagnet: saveData.hasInvestigatedMagnet,
+      disturbedBeehive: saveData.hasDisturbedBeehive,
+      reachedWoodedPath: saveData.hasReachedWoodedPath,
+      seenTitleReveal: saveData.hasSeenTitleReveal,
+      refusedCopperCan: saveData.hasRefusedCopperCan,
+      ignoredCopperCan: saveData.hasIgnoredCopperCan,
+    },
+    lastMessage: saveData.lastMessage,
+    combat: saveData.combat,
   };
+}
+
+export function hydrateGameState(saveData = {}) {
+  const defaults = createInitialGameState();
+  const migratedSaveData = migrateLegacySaveData(saveData);
+  const hydratedState = {
+    ...defaults,
+    saveVersion: SAVE_VERSION,
+    lastMessage: migratedSaveData.lastMessage ?? defaults.lastMessage,
+    combat: mergeDefined(createCombatState(), migratedSaveData.combat),
+  };
+
+  SAVE_GROUP_KEYS.forEach((key) => {
+    hydratedState[key] = mergeDefined(defaults[key], migratedSaveData[key]);
+  });
+
+  return hydratedState;
+}
+
+export function serializeGameState(state = game) {
+  const hydratedState = hydrateGameState(state);
+  const saveData = {
+    saveVersion: SAVE_VERSION,
+    lastMessage: hydratedState.lastMessage,
+    combat: { ...hydratedState.combat },
+  };
+
+  SAVE_GROUP_KEYS.forEach((key) => {
+    saveData[key] = { ...hydratedState[key] };
+  });
+
+  return saveData;
+}
+
+export function saveGame() {
+  const saveData = serializeGameState();
 
   localStorage.setItem(SAVE_KEY, JSON.stringify(saveData));
 
@@ -72,44 +146,10 @@ export function loadGame() {
   try {
     const saveData = JSON.parse(rawSave);
 
-    game.screen = saveData.screen ?? "intro";
-    game.currentView = saveData.currentView ?? "can";
+    Object.assign(game, hydrateGameState(saveData));
 
-    game.copperBits = saveData.copperBits ?? 0;
-    game.silverBits = saveData.silverBits ?? 0;
-    game.goldBits = saveData.goldBits ?? 0;
-    game.hasUnlockedSilverBits = saveData.hasUnlockedSilverBits ?? false;
-    game.hasUnlockedGoldBits = saveData.hasUnlockedGoldBits ?? false;
-
-    game.health = saveData.health ?? 10;
-    game.maxHealth = saveData.maxHealth ?? 10;
-
-    game.hasCopperCan = saveData.hasCopperCan ?? false;
-    game.hasBentMagnet = saveData.hasBentMagnet ?? false;
-    game.hasInvestigatedMagnet = saveData.hasInvestigatedMagnet ?? false;
-    game.hasDisturbedBeehive = saveData.hasDisturbedBeehive ?? false;
-    game.bentMagnetBitsPerSecond = saveData.bentMagnetBitsPerSecond ?? 1;
-
-    game.hasUnlockedCopperCan = saveData.hasUnlockedCopperCan ?? false;
-    game.hasUnlockedPack = saveData.hasUnlockedPack ?? false;
-    game.hasUnlockedThoughts = saveData.hasUnlockedThoughts ?? false;
-    game.hasUnlockedMap = saveData.hasUnlockedMap ?? false;
-    game.hasUnlockedSave = saveData.hasUnlockedSave ?? false;
-    game.hasUnlockedSettings = saveData.hasUnlockedSettings ?? false;
-
-    game.hasSeenTitleReveal = saveData.hasSeenTitleReveal ?? false;
-
-    game.hasRefusedCopperCan = saveData.hasRefusedCopperCan ?? false;
-    game.hasIgnoredCopperCan = saveData.hasIgnoredCopperCan ?? false;
-
-    game.lastMessage = saveData.lastMessage ?? "";
-    game.combat = {
-      ...createCombatState(),
-      ...(saveData.combat ?? {}),
-    };
-
-    if (game.currentView === "combat" && !game.combat.active) {
-      game.currentView = game.combat.returnView ?? "map";
+    if (game.world.currentView === "combat" && !game.combat.active) {
+      game.world.currentView = game.combat.returnView ?? "map";
     }
   } catch {
     localStorage.removeItem(SAVE_KEY);

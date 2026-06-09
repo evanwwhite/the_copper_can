@@ -1,4 +1,4 @@
-import { game, statusBar, mainContent } from "./gameState.js";
+import { game, runtime } from "./gameState.js";
 import {
   BENT_MAGNET_COST,
   BEEHIVE_UNLOCK_AMOUNT,
@@ -13,9 +13,12 @@ import {
   darkTreeWatcherDeadArt,
   darkTreeWatcherArt,
   copperCanTitleArt,
+  forest,
+  forestTrailSignScene,
   introTitleArt,
   mapLines,
   playerCombatArt,
+  townScene,
 } from "./asciiArt.js";
 import {
   BOX_TEXT_WIDTH,
@@ -36,7 +39,10 @@ import {
   throwBitsOnGround,
   investigateMagnet,
   buyBentMagnet,
+  continueOnTrail,
+  continueFromTitleReveal,
   disturbBeehive,
+  followWoodedPath,
   unlockMap,
   visitCopperCan,
   visitDarkTrees,
@@ -46,8 +52,10 @@ import {
   resetPrototype,
 } from "./actions.js";
 
+const { statusBar, mainContent } = runtime;
+
 export function renderIntroScreen() {
-  game.screen = "intro";
+  game.world.screen = "intro";
   saveGame();
   setMainContentMode();
 
@@ -58,19 +66,19 @@ export function renderIntroScreen() {
 
 ${introTitleArt}
 
-                         You wake beneath a wet green canopy.
+                     You wake beneath a wet green canopy.
 
-                         The trees are too quiet.
+                     The trees are too quiet.
 
-                         In front of you sits a small oxidized copper can.
-                         A few copper bits are scattered in the dirt nearby.
+                     In front of you sits a small oxidized copper can.
+                     A few copper bits are scattered in the dirt nearby.
 
-                         You do not know who left them.
+                     You do not know who left them.
 
-                         You do not know why you want them.
+                     You do not know why you want them.
 
 
-                                      <span id="playButton" class="asciiRealButton">Begin</span>
+                                <span id="playButton" class="asciiRealButton">Begin</span>
 
 
 `;
@@ -81,20 +89,20 @@ ${introTitleArt}
 export function renderGameScreen() {
   renderTopBar();
 
-  if (game.currentView === "combat" && game.combat.active) {
+  if (game.world.currentView === "combat" && game.combat.active) {
     renderCombatView();
-  } else if (game.currentView === "map" && game.hasUnlockedMap) {
+  } else if (game.world.currentView === "map" && game.unlocks.map) {
     renderMapView();
-  } else if (game.currentView === "pack" && game.hasUnlockedPack) {
+  } else if (game.world.currentView === "pack" && game.unlocks.pack) {
     renderPackView();
-  } else if (game.currentView === "thoughts" && game.hasUnlockedThoughts) {
+  } else if (game.world.currentView === "thoughts" && game.unlocks.thoughts) {
     renderThoughtsView();
-  } else if (game.currentView === "save" && game.hasUnlockedSave) {
+  } else if (game.world.currentView === "save" && game.unlocks.save) {
     renderSaveView();
-  } else if (game.currentView === "settings" && game.hasUnlockedSettings) {
+  } else if (game.world.currentView === "settings" && game.unlocks.settings) {
     renderSettingsView();
   } else {
-    game.currentView = "can";
+    game.world.currentView = "can";
     renderCopperCanView();
   }
 
@@ -195,21 +203,23 @@ function buildCombatArenaLines() {
 }
 
 export function renderTopBar() {
-  if (game.screen !== "game") {
+  const screensWithTopBar = ["game", "forestPath", "blankPath", "town"];
+
+  if (!screensWithTopBar.includes(game.world.screen)) {
     statusBar.textContent = "";
     return;
   }
 
-  const showHealthBar = game.hasDisturbedBeehive || game.combat.active;
+  const showHealthBar = game.flags.disturbedBeehive || game.combat.active;
 
-  let currencyText = `${game.copperBits}c`;
+  let currencyText = `${game.currencies.copper}c`;
 
-  if (game.hasUnlockedSilverBits) {
-    currencyText += ` / ${game.silverBits}s`;
+  if (game.unlocks.silverBits) {
+    currencyText += ` / ${game.currencies.silver}s`;
   }
 
-  if (game.hasUnlockedGoldBits) {
-    currencyText += ` / ${game.goldBits}g`;
+  if (game.unlocks.goldBits) {
+    currencyText += ` / ${game.currencies.gold}g`;
   }
 
   const copperCanText = `Copper Can: ${currencyText}`;
@@ -231,42 +241,42 @@ export function renderTopBar() {
     "mapTab",
     "Map",
     mapWidth,
-    game.hasUnlockedMap,
+    game.unlocks.map,
   );
 
   const packButton = makeTopBarButton(
     "packTab",
     "Pack",
     packWidth,
-    game.hasUnlockedPack,
+    game.unlocks.pack,
   );
 
   const thoughtsButton = makeTopBarButton(
     "thoughtsTab",
     "Thoughts",
     thoughtsWidth,
-    game.hasUnlockedThoughts,
+    game.unlocks.thoughts,
   );
 
   const copperCanButton = makeTopBarButton(
     "copperCanTab",
     copperCanText,
     copperWidth,
-    game.hasUnlockedCopperCan,
+    game.unlocks.copperCan,
   );
 
   const saveButton = makeTopBarButton(
     "saveTab",
     "Save",
     saveWidth,
-    game.hasUnlockedSave,
+    game.unlocks.save,
   );
 
   const settingsButton = makeTopBarButton(
     "settingsTab",
     "⚙",
     settingsWidth,
-    game.hasUnlockedSettings,
+    game.unlocks.settings,
   );
 
   const buttonLine =
@@ -297,7 +307,7 @@ export function renderTopBar() {
 
   const bottomBorder = "└" + "─".repeat(topInnerWidth) + "┘";
 
-  const healthText = `${game.health}/${game.maxHealth}`;
+  const healthText = `${game.player.health}/${game.player.maxHealth}`;
   const healthPrefix = showHealthBar
     ? " ♥ HEALTH  ["
     : " ♥ ??????  [";
@@ -309,7 +319,7 @@ export function renderTopBar() {
     topInnerWidth - healthPrefix.length - healthSuffix.length;
 
   const healthBar = showHealthBar
-    ? makeHealthBar(game.health, game.maxHealth, healthBarWidth)
+    ? makeHealthBar(game.player.health, game.player.maxHealth, healthBarWidth)
     : " ".repeat(Math.max(healthBarWidth, 0));
 
   const healthLine = `│${healthPrefix}${healthBar}${healthSuffix}│`;
@@ -361,20 +371,20 @@ export function attachTopBarListeners() {
 
 export function renderCopperCanView() {
   setMainContentMode();
-  const canLines = [`Copper bits: ${game.copperBits}`];
+  const canLines = [`Copper bits: ${game.currencies.copper}`];
 
-  if (game.hasUnlockedSilverBits) {
-    canLines.push(`Silver bits: ${game.silverBits}`);
+  if (game.unlocks.silverBits) {
+    canLines.push(`Silver bits: ${game.currencies.silver}`);
   }
 
-  if (game.hasUnlockedGoldBits) {
-    canLines.push(`Gold bits: ${game.goldBits}`);
+  if (game.unlocks.goldBits) {
+    canLines.push(`Gold bits: ${game.currencies.gold}`);
   }
 
   canLines.push("");
   canLines.push(
-    game.hasBentMagnet
-      ? `Collecting rate: +${game.bentMagnetBitsPerSecond}/second`
+    game.inventory.bentMagnet
+      ? `Collecting rate: +${game.inventory.bentMagnetBitsPerSecond}/second`
       : "Collecting rate: none",
   );
 
@@ -386,7 +396,7 @@ ${makeBox("Copper Can", canLines)}
 
 `;
 
-  if (game.copperBits >= 3) {
+  if (game.currencies.copper >= 3) {
     content += `
     <span id="throwBitsButton" class="asciiRealButton">Throw a few back on the ground</span>
 
@@ -394,9 +404,9 @@ ${makeBox("Copper Can", canLines)}
   }
 
   if (
-    !game.hasUnlockedThoughts &&
-    game.copperBits >= FREE_WILL_COST &&
-    !game.hasRefusedCopperCan
+    !game.unlocks.thoughts &&
+    game.currencies.copper >= FREE_WILL_COST &&
+    !game.flags.refusedCopperCan
   ) {
     content += `
     <span id="refuseCopperCanButton" class="asciiRealButton">Do not pick up copper bit</span>
@@ -405,9 +415,9 @@ ${makeBox("Copper Can", canLines)}
   }
 
   if (
-    !game.hasUnlockedThoughts &&
-    game.hasRefusedCopperCan &&
-    !game.hasIgnoredCopperCan
+    !game.unlocks.thoughts &&
+    game.flags.refusedCopperCan &&
+    !game.flags.ignoredCopperCan
   ) {
     content += `
     <span id="ignoreCopperCanButton" class="asciiRealButton">Ignore the Can</span>
@@ -416,9 +426,9 @@ ${makeBox("Copper Can", canLines)}
   }
 
   if (
-    !game.hasUnlockedThoughts &&
-    game.hasRefusedCopperCan &&
-    game.hasIgnoredCopperCan
+    !game.unlocks.thoughts &&
+    game.flags.refusedCopperCan &&
+    game.flags.ignoredCopperCan
   ) {
     content += `
     <span id="buyFreeWillButton" class="asciiRealButton">Pay 10 bits to think about why you did that</span>
@@ -427,10 +437,10 @@ ${makeBox("Copper Can", canLines)}
   }
 
   if (
-    game.hasUnlockedThoughts &&
-    game.copperBits >= BENT_MAGNET_COST &&
-    !game.hasBentMagnet &&
-    !game.hasInvestigatedMagnet
+    game.unlocks.thoughts &&
+    game.currencies.copper >= BENT_MAGNET_COST &&
+    !game.inventory.bentMagnet &&
+    !game.flags.investigatedMagnet
   ) {
     content += `
 ${makeBox("SOMETHING ODD", [
@@ -447,10 +457,10 @@ ${makeBox("SOMETHING ODD", [
   }
 
   if (
-    game.hasUnlockedThoughts &&
-    game.copperBits >= BENT_MAGNET_COST &&
-    !game.hasBentMagnet &&
-    game.hasInvestigatedMagnet
+    game.unlocks.thoughts &&
+    game.currencies.copper >= BENT_MAGNET_COST &&
+    !game.inventory.bentMagnet &&
+    game.flags.investigatedMagnet
   ) {
     content += `
 ${makeBox("NEW ITEM", [
@@ -467,9 +477,9 @@ ${makeBox("NEW ITEM", [
   }
 
   if (
-    game.hasBentMagnet &&
-    !game.hasDisturbedBeehive &&
-    game.copperBits >= BEEHIVE_UNLOCK_AMOUNT
+    game.inventory.bentMagnet &&
+    !game.flags.disturbedBeehive &&
+    game.currencies.copper >= BEEHIVE_UNLOCK_AMOUNT
   ) {
     content += `
 ${makeBox("DISTANT BUZZING", [
@@ -484,19 +494,18 @@ ${makeBox("DISTANT BUZZING", [
   }
 
   if (
-    game.hasBentMagnet &&
-    game.hasDisturbedBeehive &&
-    !game.hasUnlockedMap &&
-    game.copperBits >= MAP_UNLOCK_AMOUNT
+    game.inventory.bentMagnet &&
+    game.flags.disturbedBeehive &&
+    game.currencies.copper >= MAP_UNLOCK_AMOUNT
   ) {
     content += `
 ${makeBox("SOMETHING MOVES", [
   "The bent magnet turns in your hand.",
   "",
-  "It points past the copper can, toward a darker patch of trees.",
+  "It points past the copper can, toward a path deeper in the woods.",
 ])}
 
-    <span id="unlockMapButton" class="asciiRealButton">Look toward the trees</span>
+    <span id="unlockMapButton" class="asciiRealButton">Venture toward the wooded path</span>
 
 `;
   }
@@ -565,16 +574,19 @@ ${makeBox("MESSAGE", [game.lastMessage])}
 export function renderMapView() {
   setMainContentMode();
   mainContent.innerHTML = `
+${forest}
+
+
 ${makePreformattedBox("MAP", mapLines)}
 
 
     <span id="visitCopperCanButton" class="asciiRealButton">Visit the copper can</span>
 
 
-    <span id="visitDarkTreesButton" class="asciiRealButton">Step toward the dark trees</span>
+    <span id="visitDarkTreesButton" class="asciiRealButton">Follow the path deeper into the woods</span>
     
 
-    <span id="fightDarkTreesButton" class="asciiRealButton">Fight</span>
+    <span id="fightDarkTreesButton" class="asciiRealButton">Face the rusty iron sign</span>
 
 `;
 
@@ -589,9 +601,60 @@ ${makePreformattedBox("MAP", mapLines)}
     .addEventListener("click", startDarkTreeFight);
 }
 
+export function renderForestPathScreen() {
+  game.world.screen = "forestPath";
+  saveGame();
+  setMainContentMode();
+
+  renderTopBar();
+
+  mainContent.innerHTML = `
+${forest}
+
+
+    <span id="followPathButton" class="asciiRealButton">Follow path?</span>
+
+`;
+
+  document
+    .getElementById("followPathButton")
+    .addEventListener("click", followWoodedPath);
+  attachTopBarListeners();
+}
+
+export function renderBlankPathScreen() {
+  game.world.screen = "blankPath";
+  saveGame();
+  setMainContentMode();
+
+  renderTopBar();
+  mainContent.innerHTML = `
+${forestTrailSignScene}
+
+
+    <span id="continueTrailButton" class="asciiRealButton">Continue on the Trail</span>
+`;
+  document
+    .getElementById("continueTrailButton")
+    .addEventListener("click", continueOnTrail);
+  attachTopBarListeners();
+}
+
+export function renderTownScreen() {
+  game.world.screen = "town";
+  saveGame();
+  setMainContentMode();
+
+  renderTopBar();
+  mainContent.innerHTML = `
+${townScene}
+`;
+  attachTopBarListeners();
+}
+
 export function renderPackView() {
   setMainContentMode();
-  const magnetText = game.hasBentMagnet ? "Bent magnet" : "Nothing useful yet";
+  const magnetText = game.inventory.bentMagnet ? "Bent magnet" : "Nothing useful yet";
 
   mainContent.innerHTML = `
 ${makeBox("PACK", [
@@ -727,8 +790,8 @@ ${makePreformattedBox("FIGHT", combatLines, COMBAT_ARENA_WIDTH)}
 }
 
 export function renderTitleRevealScreen() {
-  game.screen = "titleReveal";
-  game.hasSeenTitleReveal = true;
+  game.world.screen = "titleReveal";
+  game.flags.seenTitleReveal = true;
   saveGame();
   setMainContentMode();
 
@@ -746,18 +809,15 @@ ${copperCanTitleArt}
                          They were the beginning of something.
 
 
-                      THE COPPER CAN
+                            THE COPPER CAN
 
 
-                                      <span id="continueButton" class="asciiRealButton">Continue</span>
+                                 <span id="continueButton" class="asciiRealButton">Continue</span>
 
 
 `;
 
-  document.getElementById("continueButton").addEventListener("click", () => {
-    game.screen = "game";
-    game.currentView = "can";
-    saveGame();
-    renderGameScreen();
-  });
+  document
+    .getElementById("continueButton")
+    .addEventListener("click", continueFromTitleReveal);
 }

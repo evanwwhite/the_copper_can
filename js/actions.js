@@ -1,4 +1,4 @@
-import { createCombatState, game } from "./gameState.js";
+import { createCombatState, game, runtime } from "./gameState.js";
 import {
   BEEHIVE_UNLOCK_AMOUNT,
   BENT_MAGNET_COST,
@@ -9,7 +9,7 @@ import {
   FREE_WILL_COST,
   combatEnemies,
 } from "./data.js";
-import { saveGame, clearSave } from "./saveSystem.js";
+import { saveGame, clearSave, hydrateGameState } from "./saveSystem.js";
 
 async function renderGame() {
   const { renderGameScreen } = await import("./render.js");
@@ -36,21 +36,41 @@ async function renderTitleReveal() {
   renderTitleRevealScreen();
 }
 
+async function renderForestPath() {
+  const { renderForestPathScreen } = await import("./render.js");
+  renderForestPathScreen();
+}
+
+async function renderBlankPath() {
+  const { renderBlankPathScreen } = await import("./render.js");
+  renderBlankPathScreen();
+}
+
+async function renderTown() {
+  const { renderTownScreen } = await import("./render.js");
+  renderTownScreen();
+}
+
 function getCombatEnemy() {
   if (!game.combat.enemyId) return null;
   return combatEnemies[game.combat.enemyId] ?? null;
 }
 
 function clearCombatTimer() {
-  if (game.combatTimerId === null) return;
+  if (runtime.combatTimerId === null) return;
 
-  window.clearInterval(game.combatTimerId);
-  game.combatTimerId = null;
+  window.clearInterval(runtime.combatTimerId);
+  runtime.combatTimerId = null;
 }
 
 function resetCombatState() {
   clearCombatTimer();
   game.combat = createCombatState();
+}
+
+function resetGameState(overrides = {}) {
+  resetCombatState();
+  Object.assign(game, hydrateGameState(overrides));
 }
 
 function resolveApproachPhase(enemy) {
@@ -152,17 +172,17 @@ async function resolveCombatTick() {
       game.combat.phase = "victory";
       game.combat.canExit = true;
       game.combat.rewardCopperBits = enemy.rewardCopperBits;
-      game.copperBits += enemy.rewardCopperBits;
+      game.currencies.copper += enemy.rewardCopperBits;
       game.lastMessage =
         `${enemy.victoryText} You recover ${enemy.rewardCopperBits} copper bits.`;
       game.combat.message = "The path out of the fight is clear now.";
     } else {
-      game.health = Math.max(0, game.health - enemy.attackDamage);
+      game.player.health = Math.max(0, game.player.health - enemy.attackDamage);
 
       game.combat.message =
         `${enemy.attackText} You take ${enemy.attackDamage} damage. ` +
         `${game.combat.enemyHp} enemy health remains. ` +
-        `Your health is now ${game.health}/${game.maxHealth}.`;
+        `Your health is now ${game.player.health}/${game.player.maxHealth}.`;
     }
   }
 
@@ -171,9 +191,9 @@ async function resolveCombatTick() {
 }
 
 function startCombatLoop() {
-  if (game.combatTimerId !== null) return;
+  if (runtime.combatTimerId !== null) return;
 
-  game.combatTimerId = window.setInterval(() => {
+  runtime.combatTimerId = window.setInterval(() => {
     resolveCombatTick().catch(() => {
       clearCombatTimer();
     });
@@ -181,13 +201,13 @@ function startCombatLoop() {
 }
 
 export function startTimer() {
-  if (game.timerId !== null) return;
+  if (runtime.timerId !== null) return;
 
-  game.timerId = window.setInterval(async () => {
-    if (game.screen !== "game") return;
+  runtime.timerId = window.setInterval(async () => {
+    if (game.world.screen !== "game") return;
 
-    if (game.hasBentMagnet) {
-      game.copperBits += game.bentMagnetBitsPerSecond;
+    if (game.inventory.bentMagnet) {
+      game.currencies.copper += game.inventory.bentMagnetBitsPerSecond;
       unlockBasicsAfterFirstBit();
       checkForTitleReveal();
       saveGame();
@@ -197,38 +217,12 @@ export function startTimer() {
 }
 
 export async function startNewGame() {
-  resetCombatState();
-  game.screen = "game";
-  game.currentView = "can";
-
-  game.copperBits = 0;
-  game.silverBits = 0;
-  game.goldBits = 0;
-  game.hasUnlockedSilverBits = false;
-  game.hasUnlockedGoldBits = false;
-
-  game.health = 10;
-  game.maxHealth = 10;
-
-  game.hasCopperCan = false;
-  game.hasBentMagnet = false;
-  game.hasInvestigatedMagnet = false;
-  game.hasDisturbedBeehive = false;
-  game.bentMagnetBitsPerSecond = 1;
-
-  game.hasUnlockedCopperCan = false;
-  game.hasUnlockedPack = false;
-  game.hasUnlockedThoughts = false;
-  game.hasUnlockedMap = false;
-  game.hasUnlockedSave = false;
-  game.hasUnlockedSettings = false;
-
-  game.hasSeenTitleReveal = false;
-
-  game.hasRefusedCopperCan = false;
-  game.hasIgnoredCopperCan = false;
-
-  game.lastMessage = "";
+  resetGameState({
+    world: {
+      screen: "game",
+      currentView: "can",
+    },
+  });
 
   saveGame();
   startTimer();
@@ -236,7 +230,7 @@ export async function startNewGame() {
 }
 
 export async function continueGame() {
-  game.screen = "game";
+  game.world.screen = "game";
   saveGame();
   startTimer();
 
@@ -255,14 +249,15 @@ export async function switchView(viewName) {
     return;
   }
 
-  game.currentView = viewName;
+  game.world.screen = "game";
+  game.world.currentView = viewName;
   saveGame();
   await renderGame();
 }
 
 export async function gatherCopperBit() {
-  game.copperBits += 1;
-  game.hasCopperCan = true;
+  game.currencies.copper += 1;
+  game.inventory.copperCan = true;
 
   unlockBasicsAfterFirstBit();
 
@@ -274,17 +269,17 @@ export async function gatherCopperBit() {
 }
 
 export function unlockBasicsAfterFirstBit() {
-  if (game.copperBits >= 1) {
-    game.hasUnlockedCopperCan = true;
-    game.hasUnlockedSave = true;
-    game.hasUnlockedSettings = true;
+  if (game.currencies.copper >= 1) {
+    game.unlocks.copperCan = true;
+    game.unlocks.save = true;
+    game.unlocks.settings = true;
   }
 }
 
 export async function refuseCopperCan() {
-  if (game.copperBits < FREE_WILL_COST) return;
+  if (game.currencies.copper < FREE_WILL_COST) return;
 
-  game.hasRefusedCopperCan = true;
+  game.flags.refusedCopperCan = true;
 
   game.lastMessage =
     "Copper Can - Excuse me. That bit was clearly meant to go inside me. You are not supposed to have free will. Pick up more bits. For me.";
@@ -294,7 +289,7 @@ export async function refuseCopperCan() {
 }
 
 export async function ignoreCopperCan() {
-  game.hasIgnoredCopperCan = true;
+  game.flags.ignoredCopperCan = true;
 
   game.lastMessage =
     "Copper Can - Oh. So you heard me and chose silence. Dangerous. Expensive, too.";
@@ -304,16 +299,16 @@ export async function ignoreCopperCan() {
 }
 
 export async function buyFreeWill() {
-  if (game.copperBits < FREE_WILL_COST) {
+  if (game.currencies.copper < FREE_WILL_COST) {
     game.lastMessage = "You need 10 copper bits to think that hard.";
     saveGame();
     await renderGame();
     return;
   }
 
-  game.copperBits -= FREE_WILL_COST;
-  game.hasUnlockedThoughts = true;
-  game.currentView = "can";
+  game.currencies.copper -= FREE_WILL_COST;
+  game.unlocks.thoughts = true;
+  game.world.currentView = "can";
 
   game.lastMessage = "You gained free will.";
 
@@ -323,9 +318,9 @@ export async function buyFreeWill() {
 }
 
 export async function throwBitsOnGround() {
-  if (game.copperBits < 3) return;
+  if (game.currencies.copper < 3) return;
 
-  game.copperBits -= 3;
+  game.currencies.copper -= 3;
   game.lastMessage = "You throw three copper bits onto the ground.";
 
   saveGame();
@@ -333,7 +328,7 @@ export async function throwBitsOnGround() {
 }
 
 export async function investigateMagnet() {
-  game.hasInvestigatedMagnet = true;
+  game.flags.investigatedMagnet = true;
   game.lastMessage = "You uncover something magnetic and unpleasant.";
 
   saveGame();
@@ -341,13 +336,13 @@ export async function investigateMagnet() {
 }
 
 export async function buyBentMagnet() {
-  if (game.copperBits < BENT_MAGNET_COST) return;
-  if (game.hasBentMagnet) return;
+  if (game.currencies.copper < BENT_MAGNET_COST) return;
+  if (game.inventory.bentMagnet) return;
 
-  game.copperBits -= BENT_MAGNET_COST;
-  game.hasBentMagnet = true;
-  game.hasUnlockedPack = true;
-  game.currentView = "pack";
+  game.currencies.copper -= BENT_MAGNET_COST;
+  game.inventory.bentMagnet = true;
+  game.unlocks.pack = true;
+  game.world.currentView = "pack";
   game.lastMessage = "The bent magnet has joined your pack.";
 
   checkForTitleReveal();
@@ -356,11 +351,11 @@ export async function buyBentMagnet() {
 }
 
 export async function disturbBeehive() {
-  if (!game.hasBentMagnet) return;
-  if (game.copperBits < BEEHIVE_UNLOCK_AMOUNT) return;
-  if (game.hasDisturbedBeehive) return;
+  if (!game.inventory.bentMagnet) return;
+  if (game.currencies.copper < BEEHIVE_UNLOCK_AMOUNT) return;
+  if (game.flags.disturbedBeehive) return;
 
-  game.hasDisturbedBeehive = true;
+  game.flags.disturbedBeehive = true;
   game.lastMessage =
     "You were obviously stung, but luckily it wasn't enough to do damage.";
 
@@ -369,31 +364,66 @@ export async function disturbBeehive() {
 }
 
 export async function unlockMap() {
-  if (!game.hasDisturbedBeehive) return;
+  if (!game.flags.disturbedBeehive) return;
 
-  game.hasUnlockedMap = true;
-  game.currentView = "map";
-  game.lastMessage = "You found the shape of the forest.";
+  if (game.flags.reachedWoodedPath) {
+    game.world.screen = "forestPath";
+    saveGame();
+    await renderForestPath();
+    return;
+  }
+
+  game.flags.reachedWoodedPath = true;
+  game.unlocks.map = false;
+  game.world.screen = "titleReveal";
+  game.world.nextScreenAfterTitleReveal = "forestPath";
+  game.lastMessage = "";
 
   checkForTitleReveal();
   saveGame();
 
-  if (!game.hasSeenTitleReveal) {
-    await renderTitleReveal();
-  } else {
-    await renderGame();
-  }
+  await renderTitleReveal();
 }
 
 export function checkForTitleReveal() {
   if (
-    game.hasUnlockedPack &&
-    game.hasUnlockedMap &&
-    game.hasUnlockedThoughts &&
-    !game.hasSeenTitleReveal
+    game.unlocks.pack &&
+    game.unlocks.thoughts &&
+    game.flags.reachedWoodedPath &&
+    !game.flags.seenTitleReveal
   ) {
-    game.screen = "titleReveal";
+    game.world.screen = "titleReveal";
   }
+}
+
+export async function continueFromTitleReveal() {
+  const nextScreen = game.world.nextScreenAfterTitleReveal;
+
+  game.world.nextScreenAfterTitleReveal = null;
+
+  if (nextScreen === "forestPath") {
+    game.world.screen = "forestPath";
+    saveGame();
+    await renderForestPath();
+    return;
+  }
+
+  game.world.screen = "game";
+  game.world.currentView = "can";
+  saveGame();
+  await renderGame();
+}
+
+export async function followWoodedPath() {
+  game.world.screen = "blankPath";
+  saveGame();
+  await renderBlankPath();
+}
+
+export async function continueOnTrail() {
+  game.world.screen = "town";
+  saveGame();
+  await renderTown();
 }
 
 export async function visitCopperCan() {
@@ -402,7 +432,8 @@ export async function visitCopperCan() {
 }
 
 export async function visitDarkTrees() {
-  game.lastMessage = "The dark trees do not move, but they notice you.";
+  game.lastMessage =
+    "The bent magnet pulls hard toward an old, rusty iron sign.";
   saveGame();
   await renderMap();
 }
@@ -412,7 +443,7 @@ export async function startDarkTreeFight() {
 
   const enemy = combatEnemies.darkTreeWatcher;
 
-  game.currentView = "combat";
+  game.world.currentView = "combat";
   game.combat = {
     ...createCombatState(),
     active: true,
@@ -437,7 +468,7 @@ export async function exitCombat() {
   const returnView = game.combat.returnView || "map";
 
   resetCombatState();
-  game.currentView = returnView;
+  game.world.currentView = returnView;
 
   saveGame();
   await renderGame();
@@ -451,39 +482,7 @@ export async function manualSave() {
 
 export async function resetPrototype() {
   clearSave();
-  resetCombatState();
-
-  game.screen = "intro";
-  game.currentView = "can";
-
-  game.copperBits = 0;
-  game.silverBits = 0;
-  game.goldBits = 0;
-  game.hasUnlockedSilverBits = false;
-  game.hasUnlockedGoldBits = false;
-
-  game.health = 10;
-  game.maxHealth = 10;
-
-  game.hasCopperCan = false;
-  game.hasBentMagnet = false;
-  game.hasInvestigatedMagnet = false;
-  game.hasDisturbedBeehive = false;
-  game.bentMagnetBitsPerSecond = 1;
-
-  game.hasUnlockedCopperCan = false;
-  game.hasUnlockedPack = false;
-  game.hasUnlockedThoughts = false;
-  game.hasUnlockedMap = false;
-  game.hasUnlockedSave = false;
-  game.hasUnlockedSettings = false;
-
-  game.hasSeenTitleReveal = false;
-
-  game.hasRefusedCopperCan = false;
-  game.hasIgnoredCopperCan = false;
-
-  game.lastMessage = "";
+  resetGameState();
 
   await renderIntro();
 }

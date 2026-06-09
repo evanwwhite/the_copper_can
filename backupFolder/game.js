@@ -147,26 +147,28 @@ function renderIntroScreen() {
   mainContent.innerHTML = String.raw`
 
 
-                         _   _       _   _ _   _          _ 
-                        | | | |_ __ | |_(_) |_| | ___  __| |
-                        | | | | '_ \| __| | __| |/ _ \/ _' |
-                        | |_| | | | | |_| | |_| |  __/ (_| |
-                         \___/|_| |_|\__|_|\__|_|\___|\__,_|
+                       _   _       _   _ _   _          _ 
+                      | | | |_ __ | |_(_) |_| | ___  __| |
+                      | | | | '_ \| __| | __| |/ _ \/ _' |
+                      | |_| | | | | |_| | |_| |  __/ (_| |
+                       \___/|_| |_|\__|_|\__|_|\___|\__,_|
 
 
-                         You wake beneath a wet green canopy.
+                       
+                       You wake beneath a wet green canopy.
 
-                         The trees are too quiet.
+                       The trees are too quiet.
 
-                         In front of you sits a small oxidized copper can.
-                         A few copper bits are scattered in the dirt nearby.
+                       In front of you sits a small oxidized copper can.
+                       A few copper bits are scattered in the dirt nearby.
 
-                         You do not know who left them.
+                       You do not know who left them.
 
-                         You do not know why you want them.
+                       You do not know why you want them.
 
 
-                                      <span id="playButton" class="asciiRealButton">Begin</span>
+                        
+                              <span id="playButton" class="asciiRealButton">Begin</span>
 
 
 `;
