@@ -2,11 +2,13 @@ import { game } from "./gameState.js";
 import { loadGame } from "./saveSystem.js";
 import {
   renderBlankPathScreen,
+  renderDarkForestScreen,
   renderForestPathScreen,
   renderIntroScreen,
   renderTitleRevealScreen,
+  renderTownInteriorScreen,
   renderTownScreen,
-} from "./render.js";
+} from "./renderHelper.js";
 import { continueGame } from "./actions.js";
 
 function boot() {
@@ -22,6 +24,10 @@ function boot() {
     renderBlankPathScreen();
   } else if (game.world.screen === "town") {
     renderTownScreen();
+  } else if (game.world.screen === "townInterior") {
+    renderTownInteriorScreen();
+  } else if (game.world.screen === "darkForest") {
+    renderDarkForestScreen();
   } else {
     renderIntroScreen();
   }

@@ -1,36 +1,86 @@
-export const game = {
-  screen: "intro",
-  currentView: "can",
+export function createCombatState() {
+  return {
+    active: false,
+    phase: "idle",
+    enemyId: null,
+    enemyHp: 0,
+    enemyMaxHp: 0,
+    playerX: 2,
+    enemyX: 58,
+    canExit: false,
+    returnScreen: "game",
+    returnView: "map",
+    message: "",
+    rewardCopperBits: 0,
+  };
+}
 
-  copperBits: 0,
-  silverBits: 0,
-  goldBits: 0,
-  hasUnlockedSilverBits: false,
-  hasUnlockedGoldBits: false,
+export const SAVE_VERSION = 2;
 
-  health: 10,
-  maxHealth: 10,
+export function createInitialGameState() {
+  return {
+    saveVersion: SAVE_VERSION,
 
-  hasCopperCan: false,
-  hasBentMagnet: false,
-  hasInvestigatedMagnet: false,
-  bentMagnetBitsPerSecond: 1,
+    world: {
+      screen: "intro",
+      currentView: "can",
+      nextScreenAfterTitleReveal: null,
+    },
 
-  hasUnlockedCopperCan: false,
-  hasUnlockedPack: false,
-  hasUnlockedThoughts: false,
-  hasUnlockedMap: false,
-  hasUnlockedSave: false,
-  hasUnlockedSettings: false,
+    currencies: {
+      copper: 0,
+      silver: 0,
+      gold: 0,
+    },
 
-  hasSeenTitleReveal: false,
+    player: {
+      health: 10,
+      maxHealth: 10,
+    },
 
-  hasRefusedCopperCan: false,
-  hasIgnoredCopperCan: false,
+    inventory: {
+      copperCan: false,
+      bentMagnet: false,
+      bentMagnetBitsPerSecond: 1,
+    },
 
-  lastMessage: "",
+    unlocks: {
+      copperCan: false,
+      pack: false,
+      thoughts: false,
+      map: false,
+      save: false,
+      settings: false,
+      silverBits: false,
+      goldBits: false,
+    },
+
+    flags: {
+      investigatedMagnet: false,
+      disturbedBeehive: false,
+      reachedWoodedPath: false,
+      seenTitleReveal: false,
+      refusedCopperCan: false,
+      ignoredCopperCan: false,
+      acceptedDarkForestChallenge: false,
+    },
+
+    lastMessage: "",
+    combat: createCombatState(),
+  };
+}
+
+export const game = createInitialGameState();
+
+export const runtime = {
   timerId: null,
+  combatTimerId: null,
+  statusBar:
+    typeof document === "undefined"
+      ? null
+      : document.getElementById("statusBar"),
+  mainContent:
+    typeof document === "undefined"
+      ? null
+      : document.getElementById("mainContent"),
 };
-
-export const statusBar = document.getElementById("statusBar");
-export const mainContent = document.getElementById("mainContent");

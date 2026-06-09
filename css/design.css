@@ -82,6 +82,42 @@ pre {
   background-color: #eeebe7;
 }
 
+.townBuildingEnterable {
+  cursor: pointer;
+}
+
+.townBuildingHover:hover {
+  background-color: #eeeeee;
+}
+
+.darkTreeWatcherSprite {
+  cursor: pointer;
+}
+
+.darkTreeWatcherSprite:hover {
+  background-color: #eeeeee;
+}
+
+.townHoverLabel {
+  position: fixed;
+  z-index: 200;
+  display: none;
+  padding: 1px 6px;
+  border: 1px solid #464c54;
+  background-color: #ffffff;
+  color: #111111;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 1em;
+  line-height: 1.2;
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translateX(-50%);
+}
+
+.townHoverLabel.visible {
+  display: inline-block;
+}
+
 .hidden {
   display: none;
 }

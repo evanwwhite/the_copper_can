@@ -1,12 +1,38 @@
-import { game, statusBar, mainContent } from "./gameState.js";
+import { game, runtime } from "./gameState.js";
 import {
   BENT_MAGNET_COST,
+  BEEHIVE_UNLOCK_AMOUNT,
+  COMBAT_ARENA_HEIGHT,
+  COMBAT_ARENA_WIDTH,
   MAP_UNLOCK_AMOUNT,
   FREE_WILL_COST,
+  combatEnemies,
   thoughts,
 } from "./data.js";
-import { introTitleArt, bitsBoxTitleArt, mapLines } from "./asciiArt.js";
-import { BOX_TEXT_WIDTH, makeBox, wrapText } from "./helpers.js";
+import {
+  bentMagnetAsset,
+  copperCanAsset,
+  darkTreeWatcherDeadArt,
+  darkTreeWatcherArt,
+  copperCanTitleArt,
+  elderPine,
+  forest,
+  forestTrailSignScene,
+  introTitleArt,
+  inventoryScreenMassive,
+  layeredPineLarge,
+  mapLines,
+  playerCombatArt,
+  townScene,
+  villagerSmall,
+} from "./asciiArt.js";
+import {
+  BOX_TEXT_WIDTH,
+  centerText,
+  makeBox,
+  makePreformattedBox,
+  wrapText,
+} from "./helpers.js";
 import { saveGame } from "./saveSystem.js";
 
 import {
@@ -19,16 +45,70 @@ import {
   throwBitsOnGround,
   investigateMagnet,
   buyBentMagnet,
+  continueOnTrail,
+  continueFromTitleReveal,
+  disturbBeehive,
+  followWoodedPath,
   unlockMap,
   visitCopperCan,
   visitDarkTrees,
+  startDarkTreeFight,
+  exitCombat,
+  enterTownBuilding,
+  leaveTownBuilding,
+  acceptDarkForestChallenge,
+  enterDarkForest,
+  leaveDarkForest,
   manualSave,
   resetPrototype,
 } from "./actions.js";
 
+const { statusBar, mainContent } = runtime;
+
+const TOWN_BUILDING_HOVER_REGIONS = [
+  { id: "riversideInn", label: "Riverside Inn", x: 7, y: 15, width: 23, height: 10, canEnter: true },
+  { id: "villageHall", label: "Village Hall", x: 56, y: 16, width: 27, height: 9, canEnter: true },
+  { id: "villageShop", label: "Village Shop", x: 34, y: 18, width: 14, height: 7, canEnter: true },
+  { id: "blacksmith", label: "Blacksmith", x: 76, y: 20, width: 27, height: 12, canEnter: true },
+];
+
+const DARK_FOREST_HOVER_REGION = {
+  id: "darkForest",
+  label: "Dark Forest",
+  x: 49,
+  y: 5,
+  width: 10,
+  height: 2,
+  canEnter: true,
+};
+
+const DARK_FOREST_WATCHER_POSITION = {
+  x: 53,
+  y: 21,
+};
+
+const VILLAGE_HALL_DIALOGUE = [
+  [
+    "At night, something comes down",
+    "from the dark trees across",
+    "the river.",
+  ],
+  [
+    "It scrapes at shutters, steals",
+    "warmth from the hearths, and",
+    "leaves claw marks in the mud.",
+  ],
+  [
+    "Cross the river and face it.",
+    "Avenge this town before the",
+    "next moon rises.",
+  ],
+];
+
 export function renderIntroScreen() {
-  game.screen = "intro";
+  game.world.screen = "intro";
   saveGame();
+  setMainContentMode();
 
   statusBar.textContent = "";
 
@@ -37,19 +117,19 @@ export function renderIntroScreen() {
 
 ${introTitleArt}
 
-                         You wake beneath a wet green canopy.
+                     You wake beneath a wet green canopy.
 
-                         The trees are too quiet.
+                     The trees are too quiet.
 
-                         In front of you sits a small oxidized copper can.
-                         A few copper bits are scattered in the dirt nearby.
+                     In front of you sits a small oxidized copper can.
+                     A few copper bits are scattered in the dirt nearby.
 
-                         You do not know who left them.
+                     You do not know who left them.
 
-                         You do not know why you want them.
+                     You do not know why you want them.
 
 
-                                      <span id="playButton" class="asciiRealButton">Begin</span>
+                                <span id="playButton" class="asciiRealButton">Begin</span>
 
 
 `;
@@ -60,72 +140,666 @@ ${introTitleArt}
 export function renderGameScreen() {
   renderTopBar();
 
-  if (game.currentView === "map" && game.hasUnlockedMap) {
+  if (
+    game.world.currentView === "combat" &&
+    (game.combat.active || game.combat.canExit)
+  ) {
+    renderCombatView();
+  } else if (game.world.currentView === "map" && game.unlocks.map) {
     renderMapView();
-  } else if (game.currentView === "pack" && game.hasUnlockedPack) {
+  } else if (game.world.currentView === "pack" && game.unlocks.pack) {
     renderPackView();
-  } else if (game.currentView === "thoughts" && game.hasUnlockedThoughts) {
+  } else if (game.world.currentView === "thoughts" && game.unlocks.thoughts) {
     renderThoughtsView();
-  } else if (game.currentView === "save" && game.hasUnlockedSave) {
+  } else if (game.world.currentView === "save" && game.unlocks.save) {
     renderSaveView();
-  } else if (game.currentView === "settings" && game.hasUnlockedSettings) {
+  } else if (game.world.currentView === "settings") {
     renderSettingsView();
   } else {
-    game.currentView = "can";
+    game.world.currentView = "can";
     renderCopperCanView();
   }
 
   attachTopBarListeners();
 }
 
+function fitVisibleText(text, width) {
+  const value = String(text);
+
+  if (value.length > width) {
+    return value.slice(0, width - 1) + "…";
+  }
+
+  return value;
+}
+
+function makeTopBarButton(id, label, width, isUnlocked) {
+  const visibleText = fitVisibleText(isUnlocked ? label : "???", width);
+
+  if (!isUnlocked) {
+    return centerText(visibleText, width);
+  }
+
+  return `<span id="${id}" class="asciiButton" style="width:${width}ch"><span class="asciiButtonLabel">${visibleText}</span></span>`;
+}
+
+function makeHealthBar(current, max, width) {
+  const safeMax = Math.max(max, 1);
+  const safeCurrent = Math.max(0, Math.min(current, safeMax));
+
+  const filledAmount = Math.round((safeCurrent / safeMax) * width);
+  const emptyAmount = width - filledAmount;
+
+  return "■".repeat(filledAmount) + "□".repeat(emptyAmount);
+}
+
+function setMainContentMode(modeName = "") {
+  mainContent.className = modeName;
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
+function overlayAsciiArt(baseArt, overlays) {
+  const lines = baseArt.trim().split("\n").map(line => [...line]);
+
+  overlays.forEach(({ art, x, y }) => {
+    art.trim().split("\n").forEach((artLine, artY) => {
+      [...artLine].forEach((character, artX) => {
+        if (character === " ") return;
+
+        const targetY = y + artY;
+        const targetX = x + artX;
+
+        if (!lines[targetY] || targetX < 0 || targetX >= lines[targetY].length) {
+          return;
+        }
+
+        lines[targetY][targetX] = character;
+      });
+    });
+  });
+
+  return lines.map(line => line.join("")).join("\n");
+}
+
+function buildPackInventoryArt() {
+  const overlays = [];
+
+  if (game.inventory.copperCan) {
+    overlays.push({ art: copperCanAsset, x: 4, y: 4 });
+  }
+
+  if (game.inventory.bentMagnet) {
+    overlays.push({ art: bentMagnetAsset, x: 14, y: 4 });
+  }
+
+  return overlayAsciiArt(inventoryScreenMassive, overlays);
+}
+
+function getActiveTownHoverRegions() {
+  if (!game.flags.acceptedDarkForestChallenge) {
+    return TOWN_BUILDING_HOVER_REGIONS;
+  }
+
+  return [...TOWN_BUILDING_HOVER_REGIONS, DARK_FOREST_HOVER_REGION];
+}
+
+function getTownBuildingRegion(x, y) {
+  return getActiveTownHoverRegions().find(region => {
+    return (
+      x >= region.x &&
+      x < region.x + region.width &&
+      y >= region.y &&
+      y < region.y + region.height
+    );
+  });
+}
+
+function buildTownSceneMarkup() {
+  const lines = townScene.split("\n");
+
+  const sceneMarkup = lines.map((line, y) => {
+    return [...line].map((character, x) => {
+      const region = getTownBuildingRegion(x, y);
+      const visibleCharacter = escapeHtml(character);
+
+      if (!region) {
+        return visibleCharacter;
+      }
+
+      const label = escapeHtml(region.label);
+      const buildingId = escapeHtml(region.id);
+      const classes = region.canEnter
+        ? "townBuildingHover townBuildingEnterable"
+        : "townBuildingHover";
+
+      return `<span class="${classes}" data-town-building="${buildingId}" data-town-label="${label}">${visibleCharacter}</span>`;
+    }).join("");
+  }).join("\n");
+
+  return `<span id="townScene" class="townScene">${sceneMarkup}</span><span id="townHoverLabel" class="townHoverLabel"></span>`;
+}
+
+function hideTownHoverLabel(hoverLabel) {
+  hoverLabel.classList.remove("visible");
+  hoverLabel.textContent = "";
+}
+
+function getTownSceneMetrics(townSceneElement) {
+  const bounds = townSceneElement.getBoundingClientRect();
+  const lines = townScene.split("\n");
+  const widestLineWidth = Math.max(...lines.map(line => [...line].length), 1);
+  const style = window.getComputedStyle(townSceneElement);
+  const fontSize = Number.parseFloat(style.fontSize) || 16;
+  const lineHeight = Number.parseFloat(style.lineHeight) || fontSize * 1.2;
+
+  return {
+    charWidth: bounds.width / widestLineWidth,
+    lineHeight,
+    left: bounds.left,
+    top: bounds.top,
+  };
+}
+
+function positionTownHoverLabel(hoverLabel, townSceneElement, region) {
+  const metrics = getTownSceneMetrics(townSceneElement);
+  const centerColumn = region.x + region.width / 2;
+  const bottomRow = region.y + region.height;
+
+  hoverLabel.style.left = `${metrics.left + centerColumn * metrics.charWidth}px`;
+  hoverLabel.style.top = `${metrics.top + bottomRow * metrics.lineHeight + 4}px`;
+}
+
+function attachTownHoverListeners() {
+  const townSceneElement = document.getElementById("townScene");
+  const hoverLabel = document.getElementById("townHoverLabel");
+
+  if (!townSceneElement || !hoverLabel) {
+    return;
+  }
+
+  townSceneElement.addEventListener("mousemove", event => {
+    const target = event.target instanceof Element
+      ? event.target.closest(".townBuildingHover")
+      : null;
+
+    if (!target || !townSceneElement.contains(target)) {
+      hideTownHoverLabel(hoverLabel);
+      return;
+    }
+
+    const region = getActiveTownHoverRegions().find(item => {
+      return item.id === target.dataset.townBuilding;
+    });
+
+    if (!region) {
+      hideTownHoverLabel(hoverLabel);
+      return;
+    }
+
+    hoverLabel.textContent = region.label;
+    positionTownHoverLabel(hoverLabel, townSceneElement, region);
+    hoverLabel.classList.add("visible");
+  });
+
+  townSceneElement.addEventListener("mouseleave", () => {
+    hideTownHoverLabel(hoverLabel);
+  });
+
+  townSceneElement.addEventListener("click", event => {
+    const target = event.target instanceof Element
+      ? event.target.closest(".townBuildingHover")
+      : null;
+
+    if (!target || !townSceneElement.contains(target)) {
+      return;
+    }
+
+    const region = getActiveTownHoverRegions().find(item => {
+      return item.id === target.dataset.townBuilding;
+    });
+
+    if (!region?.canEnter) {
+      return;
+    }
+
+    if (region.id === "darkForest") {
+      enterDarkForest();
+      return;
+    }
+
+    enterTownBuilding(region.id);
+  });
+}
+
+function getAsciiLines(art) {
+  return art.split("\n").filter(line => line.trim() !== "");
+}
+
+function createRoomCanvas(width = 74, height = 24) {
+  const canvas = Array.from({ length: height }, () =>
+    Array.from({ length: width }, () => " "),
+  );
+
+  for (let column = 0; column < width; column += 1) {
+    canvas[0][column] = column === 0 || column === width - 1 ? "+" : "-";
+    canvas[height - 1][column] = column === 0 || column === width - 1 ? "+" : "-";
+  }
+
+  for (let row = 1; row < height - 1; row += 1) {
+    canvas[row][0] = "|";
+    canvas[row][width - 1] = "|";
+  }
+
+  return canvas;
+}
+
+function placeInteriorLines(canvas, lines, x, y) {
+  lines.forEach((line, rowOffset) => {
+    [...line].forEach((character, columnOffset) => {
+      const rowIndex = y + rowOffset;
+      const columnIndex = x + columnOffset;
+
+      if (
+        rowIndex < 0 ||
+        rowIndex >= canvas.length ||
+        columnIndex < 0 ||
+        columnIndex >= canvas[0].length
+      ) {
+        return;
+      }
+
+      canvas[rowIndex][columnIndex] = character;
+    });
+  });
+}
+
+function placeInteriorText(canvas, text, x, y) {
+  placeInteriorLines(canvas, [text], x, y);
+}
+
+function addRoomTitle(canvas, title) {
+  placeInteriorText(canvas, `[ ${title} ]`, 3, 1);
+}
+
+function addRoomFloor(canvas) {
+  const floorRow = canvas.length - 5;
+
+  for (let column = 1; column < canvas[0].length - 1; column += 1) {
+    canvas[floorRow][column] = "_";
+  }
+}
+
+function createDarkForestSceneLines() {
+  const width = 112;
+  const height = 29;
+  const canvas = Array.from({ length: height }, () =>
+    Array.from({ length: width }, () => " "),
+  );
+  const layeredPineLines = getAsciiLines(layeredPineLarge);
+  const elderPineLines = getAsciiLines(elderPine);
+
+  placeSprite(canvas, layeredPineLines, 4, 1);
+  placeSprite(canvas, elderPineLines, 23, 5);
+  placeSprite(canvas, layeredPineLines, 39, 0);
+  placeSprite(canvas, elderPineLines, 61, 4);
+  placeSprite(canvas, layeredPineLines, 82, 1);
+  placeSprite(canvas, elderPineLines, 96, 7);
+
+  placeSprite(canvas, elderPineLines, 7, 13);
+  placeSprite(canvas, layeredPineLines, 31, 12);
+  placeSprite(canvas, elderPineLines, 55, 14);
+  placeSprite(canvas, layeredPineLines, 76, 13);
+
+  placeSprite(canvas, [
+    "       DARK FOREST",
+    "  the trees lean toward the river",
+  ], 38, 2);
+  placeSprite(canvas, [
+    "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
+  ], 14, 25);
+  placeSprite(
+    canvas,
+    darkTreeWatcherArt,
+    DARK_FOREST_WATCHER_POSITION.x,
+    DARK_FOREST_WATCHER_POSITION.y,
+  );
+
+  return canvas.map(row => row.join(""));
+}
+
+function isDarkForestWatcherCell(x, y) {
+  const rowOffset = y - DARK_FOREST_WATCHER_POSITION.y;
+
+  if (rowOffset < 0 || rowOffset >= darkTreeWatcherArt.length) {
+    return false;
+  }
+
+  const line = darkTreeWatcherArt[rowOffset];
+  const columnOffset = x - DARK_FOREST_WATCHER_POSITION.x;
+
+  return columnOffset >= 0 &&
+    columnOffset < line.length &&
+    line[columnOffset] !== " ";
+}
+
+function createDarkForestSceneMarkup() {
+  return createDarkForestSceneLines().map((line, y) => {
+    return [...line].map((character, x) => {
+      const visibleCharacter = escapeHtml(character);
+
+      if (!isDarkForestWatcherCell(x, y)) {
+        return visibleCharacter;
+      }
+
+      return `<span class="darkTreeWatcherSprite">${visibleCharacter}</span>`;
+    }).join("");
+  }).join("\n");
+}
+
+function buildVillageHallInteriorLines(dialogueStep = 0) {
+  const canvas = createRoomCanvas();
+  const dialogueLines =
+    VILLAGE_HALL_DIALOGUE[dialogueStep] ??
+    VILLAGE_HALL_DIALOGUE[VILLAGE_HALL_DIALOGUE.length - 1];
+  const speechBox = makeBox("VILLAGER", dialogueLines, 33).split("\n");
+
+  addRoomTitle(canvas, "Village Hall");
+  addRoomFloor(canvas);
+  placeInteriorLines(canvas, [
+    "     ___                 ___",
+    "    |   |               |   |",
+    "    |___|               |___|",
+  ], 8, 4);
+  placeInteriorLines(canvas, speechBox, 28, 7);
+  placeSprite(canvas, getAsciiLines(villagerSmall), 18, 15);
+
+  return canvas.map(row => row.join("")).join("\n");
+}
+
+function buildRiversideInnInteriorLines() {
+  const canvas = createRoomCanvas();
+
+  addRoomTitle(canvas, "Riverside Inn");
+  addRoomFloor(canvas);
+  placeInteriorLines(canvas, [
+    "     _________                 _________",
+    "    | mug mug |               |  cot   |",
+    "    |_________|               |________|",
+  ], 9, 5);
+  placeInteriorLines(canvas, [
+    "              __________________",
+    "             |__|__|__|__|__|__|",
+    "             |   quiet counter  |",
+    "             |__________________|",
+  ], 20, 12);
+
+  return canvas.map(row => row.join("")).join("\n");
+}
+
+function buildVillageShopInteriorLines() {
+  const canvas = createRoomCanvas();
+
+  addRoomTitle(canvas, "Village Shop");
+  addRoomFloor(canvas);
+  placeInteriorLines(canvas, [
+    "       ______________________________",
+    "      |  twine  | lantern | crumbs  |",
+    "      |_________|_________|_________|",
+    "      |  maps   | magnets | jars    |",
+    "      |_________|_________|_________|",
+  ], 14, 6);
+  placeInteriorLines(canvas, [
+    "                 __________",
+    "                |  counter |",
+    "                |__________|",
+  ], 24, 16);
+
+  return canvas.map(row => row.join("")).join("\n");
+}
+
+function buildBlacksmithInteriorLines() {
+  const canvas = createRoomCanvas();
+
+  addRoomTitle(canvas, "Blacksmith");
+  addRoomFloor(canvas);
+  placeInteriorLines(canvas, [
+    "       (  )                 ______",
+    "        )(                 / ____ \\",
+    "       _||_               /_/____\\_\\",
+    "      /____\\                |    |",
+    "      |    |                |____|",
+  ], 10, 5);
+  placeInteriorLines(canvas, [
+    "                         ______",
+    "              ______    / ____ \\",
+    "             /_____/|  /_/____\\_\\",
+    "             |_____|/    ANVIL",
+  ], 24, 14);
+
+  return canvas.map(row => row.join("")).join("\n");
+}
+
+function getTownInteriorScene(buildingId, dialogueStep = 0) {
+  if (buildingId === "villageHall") {
+    return buildVillageHallInteriorLines(dialogueStep);
+  }
+
+  if (buildingId === "riversideInn") return buildRiversideInnInteriorLines();
+  if (buildingId === "villageShop") return buildVillageShopInteriorLines();
+  if (buildingId === "blacksmith") return buildBlacksmithInteriorLines();
+
+  return buildVillageHallInteriorLines(dialogueStep);
+}
+
+function placeSprite(canvas, spriteLines, x, y) {
+  spriteLines.forEach((line, rowOffset) => {
+    [...line].forEach((character, columnOffset) => {
+      const rowIndex = y + rowOffset;
+      const columnIndex = x + columnOffset;
+
+      if (
+        character === " " ||
+        rowIndex < 0 ||
+        rowIndex >= canvas.length ||
+        columnIndex < 0 ||
+        columnIndex >= canvas[0].length
+      ) {
+        return;
+      }
+
+      canvas[rowIndex][columnIndex] = character;
+    });
+  });
+}
+
+function getSpriteWidth(spriteLines) {
+  return spriteLines.reduce((maximumWidth, line) => {
+    return Math.max(maximumWidth, line.length);
+  }, 0);
+}
+
+function getCombatEnemyArt() {
+  if (game.combat.canExit || game.combat.enemyHp === 0) {
+    return darkTreeWatcherDeadArt;
+  }
+
+  return darkTreeWatcherArt;
+}
+
+function buildCombatArenaLines() {
+  const canvas = Array.from({ length: COMBAT_ARENA_HEIGHT }, () =>
+    Array.from({ length: COMBAT_ARENA_WIDTH }, () => " "),
+  );
+
+  const floorRow = COMBAT_ARENA_HEIGHT - 2;
+
+  for (let column = 0; column < COMBAT_ARENA_WIDTH; column += 1) {
+    canvas[floorRow][column] = "_";
+  }
+
+  const playerY = floorRow - playerCombatArt.length + 1;
+  const enemyArt = getCombatEnemyArt();
+  const enemyY = floorRow - enemyArt.length + 1;
+  const liveEnemyWidth = getSpriteWidth(darkTreeWatcherArt);
+  const enemyWidth = getSpriteWidth(enemyArt);
+  const enemyX = game.combat.enemyX + (liveEnemyWidth - enemyWidth);
+
+  placeSprite(canvas, playerCombatArt, game.combat.playerX, playerY);
+  placeSprite(canvas, enemyArt, enemyX, enemyY);
+
+  return canvas.map((row) => row.join(""));
+}
+
 export function renderTopBar() {
-  if (game.screen !== "game") {
+  const screensWithTopBar = [
+    "game",
+    "forestPath",
+    "blankPath",
+    "town",
+    "townInterior",
+    "darkForest",
+  ];
+
+  if (!screensWithTopBar.includes(game.world.screen)) {
     statusBar.textContent = "";
     return;
   }
 
-  const mapButton = game.hasUnlockedMap
-    ? `<span id="mapTab" class="asciiButton">Map</span>`
-    : `???`;
+  const showHealthBar = game.flags.disturbedBeehive || game.combat.active;
 
-  const packButton = game.hasUnlockedPack
-    ? `<span id="packTab" class="asciiButton">Pack</span>`
-    : `???`;
+  let currencyText = `${game.currencies.copper}c`;
 
-  const thoughtsButton = game.hasUnlockedThoughts
-    ? `<span id="thoughtsTab" class="asciiButton">Thoughts</span>`
-    : `???`;
-
-  let currencyText = `${game.copperBits}c`;
-
-  if (game.hasUnlockedSilverBits) {
-    currencyText += ` / ${game.silverBits}s`;
+  if (game.unlocks.silverBits) {
+    currencyText += ` / ${game.currencies.silver}s`;
   }
 
-  if (game.hasUnlockedGoldBits) {
-    currencyText += ` / ${game.goldBits}g`;
+  if (game.unlocks.goldBits) {
+    currencyText += ` / ${game.currencies.gold}g`;
   }
 
-  const copperCanButton = game.hasUnlockedCopperCan
-    ? `<span id="copperCanTab" class="asciiButton">Copper Can: ${currencyText}</span>`
-    : `???`;
+  const copperCanText = `Copper Can: ${currencyText}`;
 
-  const saveButton = game.hasUnlockedSave
-    ? `<span id="saveTab" class="asciiButton">Save</span>`
-    : `???`;
+  const mapWidth = 10;
+  const packWidth = 10;
+  const thoughtsWidth = 12;
+  const saveWidth = 8;
+  const settingsWidth = 3;
 
-  const settingsButton = game.hasUnlockedSettings
-    ? `<span id="settingsTab" class="asciiButton">⚙</span>`
-    : `???`;
+  /*
+    The copper can gets extra room.
+    If the number gets huge, the entire top bar grows instead of breaking.
+  */
+  const minimumCopperWidth = 28;
+  const copperWidth = Math.max(minimumCopperWidth, copperCanText.length + 2);
+
+  const mapButton = makeTopBarButton(
+    "mapTab",
+    "Map",
+    mapWidth,
+    game.unlocks.map,
+  );
+
+  const packButton = makeTopBarButton(
+    "packTab",
+    "Pack",
+    packWidth,
+    game.unlocks.pack,
+  );
+
+  const thoughtsButton = makeTopBarButton(
+    "thoughtsTab",
+    "Thoughts",
+    thoughtsWidth,
+    game.unlocks.thoughts,
+  );
+
+  const copperCanButton = makeTopBarButton(
+    "copperCanTab",
+    copperCanText,
+    copperWidth,
+    game.unlocks.copperCan,
+  );
+
+  const saveButton = makeTopBarButton(
+    "saveTab",
+    "Save",
+    saveWidth,
+    game.unlocks.save,
+  );
+
+  const settingsButton = makeTopBarButton(
+    "settingsTab",
+    "⚙",
+    settingsWidth,
+    true,
+  );
+
+  const buttonLine =
+    `│ ${mapButton} │ ` +
+    `${packButton} │ ` +
+    `${thoughtsButton} │ ` +
+    `${copperCanButton} │ ` +
+    `${saveButton} │ ` +
+    `${settingsButton} │`;
+
+  const cellWidths = [
+    mapWidth,
+    packWidth,
+    thoughtsWidth,
+    copperWidth,
+    saveWidth,
+    settingsWidth,
+  ];
+
+  const totalCellWidth = cellWidths.reduce((sum, width) => sum + width, 0);
+  const topInnerWidth =
+    totalCellWidth + cellWidths.length * 2 + (cellWidths.length - 1);
+
+  const topBorder = "┌" + "─".repeat(topInnerWidth) + "┐";
+
+  const buttonDivider =
+    "├" + cellWidths.map((width) => "─".repeat(width + 2)).join("┴") + "┤";
+
+  const bottomBorder = "└" + "─".repeat(topInnerWidth) + "┘";
+
+  const healthText = `${game.player.health}/${game.player.maxHealth}`;
+  const healthPrefix = showHealthBar
+    ? " ♥ HEALTH  ["
+    : " ♥ ??????  [";
+  const healthSuffix = showHealthBar
+    ? `] ${healthText} `
+    : "]       ";
+
+  const healthBarWidth =
+    topInnerWidth - healthPrefix.length - healthSuffix.length;
+
+  const healthBar = showHealthBar
+    ? makeHealthBar(game.player.health, game.player.maxHealth, healthBarWidth)
+    : " ".repeat(Math.max(healthBarWidth, 0));
+
+  const healthLine = `│${healthPrefix}${healthBar}${healthSuffix}│`;
 
   statusBar.innerHTML = `
-┌────────────────────────────────────────────────────────────────────────────────────┐
-│  ${mapButton}  │  ${packButton}  │  ${thoughtsButton}  │  ${copperCanButton}  │ ♥ ${game.health}/${game.maxHealth}  │  ${saveButton}  │ ${settingsButton} │
-└────────────────────────────────────────────────────────────────────────────────────┘
+${topBorder}
+${buttonLine}
+${buttonDivider}
+${healthLine}
+${bottomBorder}
 `;
 }
 
 export function attachTopBarListeners() {
+  if (game.combat.active) {
+    return;
+  }
+
   const mapTab = document.getElementById("mapTab");
   if (mapTab) {
     mapTab.addEventListener("click", () => switchView("map"));
@@ -158,21 +832,22 @@ export function attachTopBarListeners() {
 }
 
 export function renderCopperCanView() {
-  const canLines = [`Copper bits: ${game.copperBits}`];
+  setMainContentMode();
+  const canLines = [`Copper bits: ${game.currencies.copper}`];
 
-  if (game.hasUnlockedSilverBits) {
-    canLines.push(`Silver bits: ${game.silverBits}`);
+  if (game.unlocks.silverBits) {
+    canLines.push(`Silver bits: ${game.currencies.silver}`);
   }
 
-  if (game.hasUnlockedGoldBits) {
-    canLines.push(`Gold bits: ${game.goldBits}`);
+  if (game.unlocks.goldBits) {
+    canLines.push(`Gold bits: ${game.currencies.gold}`);
   }
 
   canLines.push("");
   canLines.push(
-    game.hasBentMagnet
-      ? `Collecting rate: +${game.bentMagnetBitsPerSecond}/second`
-      : "Collecting rate: none"
+    game.inventory.bentMagnet
+      ? `Collecting rate: +${game.inventory.bentMagnetBitsPerSecond}/second`
+      : "Collecting rate: none",
   );
 
   let content = `
@@ -183,10 +858,17 @@ ${makeBox("Copper Can", canLines)}
 
 `;
 
+  if (game.currencies.copper >= 3) {
+    content += `
+    <span id="throwBitsButton" class="asciiRealButton">Throw a few back on the ground</span>
+
+`;
+  }
+
   if (
-    !game.hasUnlockedThoughts &&
-    game.copperBits >= FREE_WILL_COST &&
-    !game.hasRefusedCopperCan
+    !game.unlocks.thoughts &&
+    game.currencies.copper >= FREE_WILL_COST &&
+    !game.flags.refusedCopperCan
   ) {
     content += `
     <span id="refuseCopperCanButton" class="asciiRealButton">Do not pick up copper bit</span>
@@ -195,9 +877,9 @@ ${makeBox("Copper Can", canLines)}
   }
 
   if (
-    !game.hasUnlockedThoughts &&
-    game.hasRefusedCopperCan &&
-    !game.hasIgnoredCopperCan
+    !game.unlocks.thoughts &&
+    game.flags.refusedCopperCan &&
+    !game.flags.ignoredCopperCan
   ) {
     content += `
     <span id="ignoreCopperCanButton" class="asciiRealButton">Ignore the Can</span>
@@ -206,9 +888,9 @@ ${makeBox("Copper Can", canLines)}
   }
 
   if (
-    !game.hasUnlockedThoughts &&
-    game.hasRefusedCopperCan &&
-    game.hasIgnoredCopperCan
+    !game.unlocks.thoughts &&
+    game.flags.refusedCopperCan &&
+    game.flags.ignoredCopperCan
   ) {
     content += `
     <span id="buyFreeWillButton" class="asciiRealButton">Pay 10 bits to think about why you did that</span>
@@ -216,17 +898,11 @@ ${makeBox("Copper Can", canLines)}
 `;
   }
 
-  if (game.copperBits >= 3) {
-    content += `
-    <span id="throwBitsButton" class="asciiRealButton">Throw a few back on the ground</span>
-
-`;
-  }
-
   if (
-    game.copperBits >= BENT_MAGNET_COST &&
-    !game.hasBentMagnet &&
-    !game.hasInvestigatedMagnet
+    game.unlocks.thoughts &&
+    game.currencies.copper >= BENT_MAGNET_COST &&
+    !game.inventory.bentMagnet &&
+    !game.flags.investigatedMagnet
   ) {
     content += `
 ${makeBox("SOMETHING ODD", [
@@ -243,9 +919,10 @@ ${makeBox("SOMETHING ODD", [
   }
 
   if (
-    game.copperBits >= BENT_MAGNET_COST &&
-    !game.hasBentMagnet &&
-    game.hasInvestigatedMagnet
+    game.unlocks.thoughts &&
+    game.currencies.copper >= BENT_MAGNET_COST &&
+    !game.inventory.bentMagnet &&
+    game.flags.investigatedMagnet
   ) {
     content += `
 ${makeBox("NEW ITEM", [
@@ -261,15 +938,36 @@ ${makeBox("NEW ITEM", [
 `;
   }
 
-  if (game.hasBentMagnet && !game.hasUnlockedMap && game.copperBits >= MAP_UNLOCK_AMOUNT) {
+  if (
+    game.inventory.bentMagnet &&
+    !game.flags.disturbedBeehive &&
+    game.currencies.copper >= BEEHIVE_UNLOCK_AMOUNT
+  ) {
+    content += `
+${makeBox("DISTANT BUZZING", [
+  "Something nearby has decided the forest needs more bees.",
+  "",
+  "The bent magnet twitches as if this is somehow your problem now.",
+])}
+
+    <span id="disturbBeehiveButton" class="asciiRealButton">Disturb the local beehive</span>
+
+`;
+  }
+
+  if (
+    game.inventory.bentMagnet &&
+    game.flags.disturbedBeehive &&
+    game.currencies.copper >= MAP_UNLOCK_AMOUNT
+  ) {
     content += `
 ${makeBox("SOMETHING MOVES", [
   "The bent magnet turns in your hand.",
   "",
-  "It points past the copper can, toward a darker patch of trees.",
+  "It points past the copper can, toward a path deeper in the woods.",
 ])}
 
-    <span id="unlockMapButton" class="asciiRealButton">Look toward the trees</span>
+    <span id="unlockMapButton" class="asciiRealButton">Venture toward the wooded path</span>
 
 `;
   }
@@ -288,12 +986,16 @@ ${makeBox("MESSAGE", [game.lastMessage])}
     gatherBitButton.addEventListener("click", gatherCopperBit);
   }
 
-  const refuseCopperCanButton = document.getElementById("refuseCopperCanButton");
+  const refuseCopperCanButton = document.getElementById(
+    "refuseCopperCanButton",
+  );
   if (refuseCopperCanButton) {
     refuseCopperCanButton.addEventListener("click", refuseCopperCan);
   }
 
-  const ignoreCopperCanButton = document.getElementById("ignoreCopperCanButton");
+  const ignoreCopperCanButton = document.getElementById(
+    "ignoreCopperCanButton",
+  );
   if (ignoreCopperCanButton) {
     ignoreCopperCanButton.addEventListener("click", ignoreCopperCan);
   }
@@ -308,7 +1010,9 @@ ${makeBox("MESSAGE", [game.lastMessage])}
     throwBitsButton.addEventListener("click", throwBitsOnGround);
   }
 
-  const investigateMagnetButton = document.getElementById("investigateMagnetButton");
+  const investigateMagnetButton = document.getElementById(
+    "investigateMagnetButton",
+  );
   if (investigateMagnetButton) {
     investigateMagnetButton.addEventListener("click", investigateMagnet);
   }
@@ -318,6 +1022,11 @@ ${makeBox("MESSAGE", [game.lastMessage])}
     buyBentMagnetButton.addEventListener("click", buyBentMagnet);
   }
 
+  const disturbBeehiveButton = document.getElementById("disturbBeehiveButton");
+  if (disturbBeehiveButton) {
+    disturbBeehiveButton.addEventListener("click", disturbBeehive);
+  }
+
   const unlockMapButton = document.getElementById("unlockMapButton");
   if (unlockMapButton) {
     unlockMapButton.addEventListener("click", unlockMap);
@@ -325,32 +1034,178 @@ ${makeBox("MESSAGE", [game.lastMessage])}
 }
 
 export function renderMapView() {
+  setMainContentMode();
   mainContent.innerHTML = `
-${makeBox("MAP", mapLines)}
+${forest}
+
+
+${makePreformattedBox("MAP", mapLines)}
 
 
     <span id="visitCopperCanButton" class="asciiRealButton">Visit the copper can</span>
-    <span id="visitDarkTreesButton" class="asciiRealButton">Step toward the dark trees</span>
+
+
+    <span id="visitDarkTreesButton" class="asciiRealButton">Follow the path deeper into the woods</span>
+    
+
+    <span id="fightDarkTreesButton" class="asciiRealButton">Face the rusty iron sign</span>
 
 `;
 
-  document.getElementById("visitCopperCanButton").addEventListener("click", visitCopperCan);
-  document.getElementById("visitDarkTreesButton").addEventListener("click", visitDarkTrees);
+  document
+    .getElementById("visitCopperCanButton")
+    .addEventListener("click", visitCopperCan);
+  document
+    .getElementById("visitDarkTreesButton")
+    .addEventListener("click", visitDarkTrees);
+  document
+    .getElementById("fightDarkTreesButton")
+    .addEventListener("click", startDarkTreeFight);
+}
+
+export function renderForestPathScreen() {
+  game.world.screen = "forestPath";
+  saveGame();
+  setMainContentMode();
+
+  renderTopBar();
+
+  mainContent.innerHTML = `
+${forest}
+
+
+    <span id="followPathButton" class="asciiRealButton">Follow path?</span>
+
+`;
+
+  document
+    .getElementById("followPathButton")
+    .addEventListener("click", followWoodedPath);
+  attachTopBarListeners();
+}
+
+export function renderBlankPathScreen() {
+  game.world.screen = "blankPath";
+  saveGame();
+  setMainContentMode();
+
+  renderTopBar();
+  mainContent.innerHTML = `
+${forestTrailSignScene}
+
+
+    <span id="continueTrailButton" class="asciiRealButton">Continue on the Trail</span>
+`;
+  document
+    .getElementById("continueTrailButton")
+    .addEventListener("click", continueOnTrail);
+  attachTopBarListeners();
+}
+
+export function renderTownScreen() {
+  game.world.screen = "town";
+  saveGame();
+  setMainContentMode();
+
+  renderTopBar();
+  mainContent.innerHTML = `
+${buildTownSceneMarkup()}
+`;
+  attachTownHoverListeners();
+  attachTopBarListeners();
+}
+
+export function renderTownInteriorScreen(villageHallDialogueStep = 0) {
+  game.world.screen = "townInterior";
+  saveGame();
+  setMainContentMode();
+
+  const isVillageHall = game.world.currentView === "villageHall";
+  const isFinalVillageHallStep =
+    villageHallDialogueStep >= VILLAGE_HALL_DIALOGUE.length - 1;
+  const villageHallDialogueButton = isFinalVillageHallStep
+    ? '<span id="acceptDarkForestChallengeButton" class="asciiRealButton">Take up the Challenge</span>'
+    : '<span id="nextVillageHallDialogueButton" class="asciiRealButton">Continue</span>';
+  const interiorButtons = isVillageHall
+    ? `    ${villageHallDialogueButton}
+
+
+    <span id="leaveTownBuildingButton" class="asciiRealButton">Leave</span>`
+    : '    <span id="leaveTownBuildingButton" class="asciiRealButton">Leave</span>';
+
+  renderTopBar();
+  mainContent.innerHTML = `
+${getTownInteriorScene(game.world.currentView, villageHallDialogueStep)}
+
+
+${interiorButtons}
+`;
+
+  const nextVillageHallDialogueButton = document.getElementById(
+    "nextVillageHallDialogueButton",
+  );
+  if (nextVillageHallDialogueButton) {
+    nextVillageHallDialogueButton.addEventListener("click", () => {
+      renderTownInteriorScreen(villageHallDialogueStep + 1);
+    });
+  }
+
+  const acceptDarkForestChallengeButton = document.getElementById(
+    "acceptDarkForestChallengeButton",
+  );
+  if (acceptDarkForestChallengeButton) {
+    acceptDarkForestChallengeButton.addEventListener(
+      "click",
+      acceptDarkForestChallenge,
+    );
+  }
+
+  document
+    .getElementById("leaveTownBuildingButton")
+    .addEventListener("click", leaveTownBuilding);
+  attachTopBarListeners();
+}
+
+export function renderDarkForestScreen() {
+  game.world.screen = "darkForest";
+  saveGame();
+  setMainContentMode();
+
+  renderTopBar();
+  mainContent.innerHTML = `
+${createDarkForestSceneMarkup()}
+
+
+    <span id="fightDarkForestWatcherButton" class="asciiRealButton hidden">Fight the darkTree watcher</span>
+
+
+    <span id="leaveDarkForestButton" class="asciiRealButton">Return to town</span>
+`;
+
+  const fightDarkForestWatcherButton = document.getElementById(
+    "fightDarkForestWatcherButton",
+  );
+
+  document.querySelectorAll(".darkTreeWatcherSprite").forEach(element => {
+    element.addEventListener("click", () => {
+      fightDarkForestWatcherButton.classList.remove("hidden");
+    });
+  });
+
+  fightDarkForestWatcherButton.addEventListener("click", startDarkTreeFight);
+
+  document
+    .getElementById("leaveDarkForestButton")
+    .addEventListener("click", leaveDarkForest);
+  attachTopBarListeners();
 }
 
 export function renderPackView() {
-  const magnetText = game.hasBentMagnet
-    ? "Bent magnet"
-    : "Nothing useful yet";
+  setMainContentMode();
+  const inventoryArt = buildPackInventoryArt();
 
   mainContent.innerHTML = `
-${makeBox("PACK", [
-  "Copper can",
-  magnetText,
-  "",
-  "The pack is where found things gather.",
-  "Some of them may be useful.",
-])}
+${escapeHtml(inventoryArt)}
 
 
     <span id="returnToCanButton" class="asciiRealButton">Return to the copper can</span>
@@ -363,7 +1218,10 @@ ${makeBox("PACK", [
 }
 
 export function renderThoughtsView() {
-  const unlockedThoughts = thoughts.filter(thought => thought.isUnlocked(game));
+  setMainContentMode();
+  const unlockedThoughts = thoughts.filter((thought) =>
+    thought.isUnlocked(game),
+  );
 
   const thoughtLines = unlockedThoughts.flatMap((thought, index) => {
     const prefix = `${index + 1}. `;
@@ -389,6 +1247,7 @@ ${makeBox("THOUGHTS", thoughtLines)}
 }
 
 export function renderSaveView() {
+  setMainContentMode();
   mainContent.innerHTML = `
 ${makeBox("SAVE", [
   "The forest remembers you automatically.",
@@ -402,10 +1261,13 @@ ${makeBox("SAVE", [
 
 `;
 
-  document.getElementById("manualSaveButton").addEventListener("click", manualSave);
+  document
+    .getElementById("manualSaveButton")
+    .addEventListener("click", manualSave);
 }
 
 export function renderSettingsView() {
+  setMainContentMode();
   mainContent.innerHTML = `
 ${makeBox("SETTINGS", [
   "There are not many settings yet.",
@@ -418,20 +1280,69 @@ ${makeBox("SETTINGS", [
 
 `;
 
-  document.getElementById("resetButton").addEventListener("click", resetPrototype);
+  document
+    .getElementById("resetButton")
+    .addEventListener("click", resetPrototype);
+}
+
+export function renderCombatView() {
+  setMainContentMode("combatView");
+
+  const enemy = combatEnemies[game.combat.enemyId];
+
+  if (!enemy) {
+    mainContent.innerHTML = "";
+    return;
+  }
+
+  const phaseLabel = game.combat.canExit
+    ? "Victory"
+    : game.combat.phase === "approach"
+      ? "Approach"
+      : "Clash";
+
+  const combatLines = [
+    `Enemy: ${enemy.name}`,
+    `Phase: ${phaseLabel}`,
+    `Enemy health: ${game.combat.enemyHp}/${game.combat.enemyMaxHp}`,
+    "",
+    ...buildCombatArenaLines(),
+    "",
+    ...wrapText(game.combat.message, COMBAT_ARENA_WIDTH),
+  ];
+
+  let content = `
+${escapeHtml(makePreformattedBox("FIGHT", combatLines, COMBAT_ARENA_WIDTH))}
+`;
+
+  if (game.combat.canExit) {
+    content += `
+
+    <span id="exitCombatButton" class="asciiRealButton">Exit fight</span>
+
+`;
+  }
+
+  mainContent.innerHTML = content;
+
+  const exitCombatButton = document.getElementById("exitCombatButton");
+  if (exitCombatButton) {
+    exitCombatButton.addEventListener("click", exitCombat);
+  }
 }
 
 export function renderTitleRevealScreen() {
-  game.screen = "titleReveal";
-  game.hasSeenTitleReveal = true;
+  game.world.screen = "titleReveal";
+  game.flags.seenTitleReveal = true;
   saveGame();
+  setMainContentMode();
 
   statusBar.textContent = "";
 
   mainContent.innerHTML = String.raw`
 
 
-${bitsBoxTitleArt}
+${copperCanTitleArt}
 
                          The can, the magnet, the map...
 
@@ -440,18 +1351,15 @@ ${bitsBoxTitleArt}
                          They were the beginning of something.
 
 
-                         BITS BOX
+                            THE COPPER CAN
 
 
-                                      <span id="continueButton" class="asciiRealButton">Continue</span>
+                                 <span id="continueButton" class="asciiRealButton">Continue</span>
 
 
 `;
 
-  document.getElementById("continueButton").addEventListener("click", () => {
-    game.screen = "game";
-    game.currentView = "can";
-    saveGame();
-    renderGameScreen();
-  });
+  document
+    .getElementById("continueButton")
+    .addEventListener("click", continueFromTitleReveal);
 }

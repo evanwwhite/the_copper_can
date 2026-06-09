@@ -51,6 +51,7 @@ function migrateLegacySaveData(saveData) {
     inventory: {
       copperCan: saveData.hasCopperCan,
       bentMagnet: saveData.hasBentMagnet,
+      map: saveData.hasMap,
       bentMagnetBitsPerSecond: saveData.bentMagnetBitsPerSecond,
     },
     unlocks: {
@@ -70,6 +71,9 @@ function migrateLegacySaveData(saveData) {
       seenTitleReveal: saveData.hasSeenTitleReveal,
       refusedCopperCan: saveData.hasRefusedCopperCan,
       ignoredCopperCan: saveData.hasIgnoredCopperCan,
+      acceptedDarkForestChallenge: saveData.hasAcceptedDarkForestChallenge,
+      defeatedDarkTreeWatcher: saveData.hasDefeatedDarkTreeWatcher,
+      receivedVillageMap: saveData.hasReceivedVillageMap,
     },
     lastMessage: saveData.lastMessage,
     combat: saveData.combat,
@@ -149,6 +153,7 @@ export function loadGame() {
     Object.assign(game, hydrateGameState(saveData));
 
     if (game.world.currentView === "combat" && !game.combat.active) {
+      game.world.screen = game.combat.returnScreen ?? "game";
       game.world.currentView = game.combat.returnView ?? "map";
     }
   } catch {

@@ -1,41 +1,45 @@
 # The Copper Can Prototype
 
-The Copper Can is a browser-based text adventure / incremental prototype built with plain HTML, CSS, and modular JavaScript. The presentation is intentionally minimal: the UI is rendered into `<pre>` blocks, ASCII art sets the tone, and player progression is driven by small state changes that unlock new views, choices, and story beats.
+The Copper Can is a browser-based text adventure / incremental prototype built with plain HTML, CSS, and modular JavaScript. The interface is rendered as ASCII-style screens in `<pre>` blocks, with progress driven by small state changes that unlock views, items, routes, and story beats.
 
-The current codebase is no longer a single-file prototype. The live game now runs from the modular files in `js/`, while `file_dump/` contains archive and reference copies from earlier or exported versions of the project.
+The live game runs from `index.html -> js/main.js -> js/*`. `backupFolder/` is archival reference material and is not loaded at runtime.
 
-## What the game currently does
+## What The Game Currently Does
 
-The player begins on an intro screen, enters the forest, and starts collecting copper bits. From there the prototype unfolds in stages:
+The player wakes in the forest, finds copper bits, and slowly opens up a stranger little world:
 
-1. The intro screen leads into the main game view.
-2. Picking up the first copper bit unlocks the visible Copper Can tab plus Save and Settings.
+1. The intro screen starts a fresh run.
+2. Picking up the first copper bit unlocks the Copper Can tab, Save, and Settings.
 3. At 3 copper bits, the player can throw bits back on the ground.
-4. At 10 copper bits, the player can refuse the can, ignore it, and eventually pay for "free will," which unlocks Thoughts.
-5. At 20 copper bits, the buried bent magnet path becomes available.
-6. Buying the bent magnet unlocks the Pack and starts passive copper-bit gain.
-7. At 35 copper bits with the magnet, the Map unlocks.
-8. Once Thoughts, Pack, and Map are all unlocked, the title reveal sequence can trigger.
+4. At 10 copper bits, the player can refuse the can, ignore it, and buy free will, which unlocks Thoughts.
+5. Investigating the buried magnet path and buying the bent magnet unlocks the Pack and starts passive copper-bit gain.
+6. The wooded path leads to town, including Village Hall, the shop, inn, and blacksmith.
+7. Village Hall can send the player across the river into the dark forest.
+8. Defeating the Rusty Iron Sign / tree watcher marks the village as liberated.
+9. Returning to Village Hall after the fight unlocks new thank-you dialogue.
+10. The villager gives the player a map as a reward.
+11. The map appears in the Pack, unlocks the Map tab in the top bar, and enables map-based travel.
+12. Once Pack, Thoughts, and the wooded path are unlocked, the title reveal sequence can trigger.
 
-Progress is saved in `localStorage` under the key `theCopperCanPrototypeSave`. Older `bitsBoxPrototypeSave` data is still loaded and migrated forward automatically.
+Progress is saved in `localStorage` under `theCopperCanPrototypeSave`. Older `bitsBoxPrototypeSave` data is still loaded and migrated forward automatically.
 
-## How it runs
+## How To Run
 
-Open `index.html` in a browser.
+Open `index.html` through a local web server so ES modules load correctly. For example:
 
-`index.html` loads `css/design.css` for styling and starts the app through:
+```sh
+python3 -m http.server
+```
+
+Then visit the printed local URL in a browser.
+
+`index.html` loads:
 
 ```html
 <script type="module" src="js/main.js"></script>
 ```
 
-At boot, `js/main.js` loads saved state and decides which screen to render:
-
-- Intro screen
-- Title reveal screen
-- Main game screen
-
-## Project structure
+## Project Structure
 
 ```text
 bits_intro_game/
@@ -46,157 +50,194 @@ bits_intro_game/
 ├── js/
 │   ├── actions.js
 │   ├── asciiArt.js
+│   ├── asciiArt/
+│   │   ├── combatSprites.js
+│   │   ├── composition.js
+│   │   ├── forestScenes.js
+│   │   ├── inventory.js
+│   │   ├── map.js
+│   │   ├── nature.js
+│   │   ├── thoughts.js
+│   │   ├── titles.js
+│   │   ├── townAssets.js
+│   │   └── townScene.js
 │   ├── data.js
 │   ├── gameState.js
 │   ├── helpers.js
 │   ├── main.js
-│   ├── render.js
+│   ├── render/
+│   │   ├── ascii.js
+│   │   ├── combatView.js
+│   │   ├── copperCanView.js
+│   │   ├── darkForestScreen.js
+│   │   ├── dom.js
+│   │   ├── gameScreen.js
+│   │   ├── introScreens.js
+│   │   ├── secondaryViews.js
+│   │   ├── topBar.js
+│   │   ├── townScreens.js
+│   │   └── worldScreens.js
+│   ├── renderHelper.js
 │   └── saveSystem.js
 └── backupFolder/
-    ├── actions.js.txt
-    ├── asciiArt.js.txt
-    ├── data.js.txt
-    ├── game.js
-    ├── gameState.js.txt
-    ├── game_v2.txt
-    ├── helpers.js.txt
-    ├── main.js.txt
-    ├── render.js.txt
-    └── saveSystem.js.txt
+    └── archived snapshots and legacy versions
 ```
 
-## Directory guide
+## Directory Guide
 
 ### `index.html`
 
-The shell page for the game. It defines the two main output areas:
+The shell page for the game. It defines:
 
 - `#statusBar` for the top navigation / resource bar
 - `#mainContent` for the active scene or menu content
 
 ### `css/`
 
-- `design.css`: layout and visual rules for the ASCII-style interface, buttons, centered layout, and fixed version label
+- `design.css`: layout, ASCII button styling, centered content, hover labels, and screen presentation
 
-### `js/` (live source of truth)
+### `js/`
 
-This is the active application code.
+The active application code.
 
-- `main.js`: bootstraps the game, loads saves, and routes to the correct starting screen
-- `gameState.js`: holds the shared mutable `game` object and DOM element references
-- `data.js`: constants, item definitions, thoughts content, location data, and the save key
-- `actions.js`: player actions and game-state mutations such as gathering bits, buying upgrades, unlocking views, saving, and resetting
-- `render.js`: all screen rendering and event binding for intro, top bar, can, map, pack, thoughts, save, settings, and title reveal views
-- `saveSystem.js`: serialization to and from `localStorage`
-- `helpers.js`: text-wrapping and ASCII box-building utilities
-- `asciiArt.js`: title art and map text assets
+- `main.js`: boots the game, loads saves, and routes to the correct starting screen
+- `gameState.js`: defines `createInitialGameState()`, grouped state defaults, combat defaults, and runtime DOM/timer references
+- `data.js`: gameplay constants, thought entries, and combat enemy data
+- `actions.js`: player actions, state mutations, combat flow, route changes, reward handling, saving, and resetting
+- `renderHelper.js`: barrel export for the render modules
+- `render/`: focused render modules for the top bar, game view, world screens, town screens, combat, pack/thoughts/save/settings, intro/title screens, and shared DOM/ASCII helpers
+- `asciiArt.js`: barrel export for ASCII assets
+- `asciiArt/`: focused ASCII modules for titles, inventory items, map art/data, thoughts screen layout, forest scenes, town scenes, nature sprites, combat sprites, and composition helpers
+- `saveSystem.js`: grouped save serialization, hydration, and legacy save migration
+- `helpers.js`: text wrapping, centering, and ASCII box helpers
 
-### `file_dump/` (archive / reference material)
+### `backupFolder/`
 
-This folder is not used by `index.html` at runtime.
+Archive/reference material only. It is not part of the live runtime path.
 
-It currently contains:
+## Architecture Overview
 
-- `.txt` snapshots of the modular files in `js/`
-- `game.js`, a legacy monolithic version of the prototype
-- `game_v2.txt`, another large snapshot/reference copy
-
-Treat `js/` as the code you should edit and `file_dump/` as historical or export material unless you intentionally want to compare versions.
-
-## Architecture overview
-
-The live game follows a simple loop:
+The live game loop is:
 
 1. `main.js` boots the app.
 2. `saveSystem.js` restores persisted state.
-3. `render.js` draws the current screen into the DOM.
-4. Button clicks call functions in `actions.js`.
-5. `actions.js` mutates `game` in `gameState.js`, saves when needed, and asks `render.js` to redraw.
+3. `renderHelper.js` exposes the appropriate render function from `js/render/`.
+4. Rendered buttons call functions in `actions.js`.
+5. `actions.js` mutates `game`, saves when needed, and triggers a redraw.
 
-That split is the main organizational improvement over the older single-file prototype in `file_dump/game.js`.
+State is grouped in `gameState.js`:
 
-## Screen and feature map
+- `world`: current screen/view and title reveal routing
+- `currencies`: copper/silver/gold counts
+- `player`: health
+- `inventory`: carried items such as the copper can, bent magnet, and map
+- `unlocks`: visible tabs and systems
+- `flags`: story and one-time progression state
+- `combat`: active fight state, return screen/view, enemy health, and messages
 
-### Intro
+## Current Feature Map
 
-- Rendered by `renderIntroScreen()`
-- Starts a fresh run through `startNewGame()`
+### Copper Can
 
-### Main game / Copper Can
-
-- Default gameplay view
-- Shows currency, collection rate, story prompts, and unlock actions
+The default main view. It shows current copper, collection rate, story prompts, and unlock actions.
 
 ### Pack
 
-- Unlocks after buying the bent magnet
-- Shows current carried items
+Unlocked by buying the bent magnet. The pack uses `inventoryScreenMassive` and overlays item art for the copper can, bent magnet, and map.
 
 ### Thoughts
 
-- Unlocks after buying free will
-- Renders unlocked thought entries from `data.js`
+Unlocked by buying free will. The thoughts tab now uses a wide ASCII panel styled like the Pack screen. Unlocked thoughts display in reverse stack order, so the newest/highest numbered thought appears first, like `8`, then `7`, down to `1`.
 
 ### Map
 
-- Unlocks after following the bent magnet progression
-- Currently links between the Copper Can and Dark Trees
+The Map tab is no longer a simple early unlock. It becomes available when the villager rewards the player with the map after the Rusty Iron Sign / tree watcher is defeated.
+
+The map screen shows the known route and provides travel buttons for:
+
+- Copper Can
+- Wooded Path
+- Village
+- Dark Forest, once the challenge is accepted
+
+After the watcher is defeated, the map marks the sign as defeated and removes the repeat fight option.
+
+### Town And Village Hall
+
+The town screen has enterable hover regions for Village Hall, Riverside Inn, Village Shop, and Blacksmith. After the Village Hall challenge is accepted, the Dark Forest region becomes available.
+
+Village Hall dialogue changes by progression state:
+
+- Before accepting the challenge: asks the player to face the threat.
+- After accepting but before victory: reminds the player the forest still waits.
+- After defeating the watcher: thanks the player for liberating the village and offers the map.
+- After receiving the map: remains thankful and points the player back to the map.
+
+### Dark Forest And Combat
+
+The dark forest contains the Rusty Iron Sign / tree watcher encounter. Combat has an approach phase, attack phase, victory state, and a return target so the player can exit back to the correct world screen. Once defeated, the dark forest revisits as quiet and no longer offers the fight.
 
 ### Save
 
-- Explains autosave and allows manual save
+Explains autosave and allows manual saving.
 
 ### Settings
 
-- Currently used for resetting prototype progress
+Currently used for resetting prototype progress.
 
-### Title reveal
+### Title Reveal
 
-- Special transition screen triggered after key systems are unlocked
+A special transition screen triggered after the key early systems are active.
 
-## Important values to tweak
+## Important Values To Tweak
 
-Most prototype tuning lives in `js/data.js`.
+Most tuning lives in `js/data.js`.
 
 ```js
-export const BENT_MAGNET_COST = 20;
+export const BENT_MAGNET_COST = 15;
+export const BEEHIVE_UNLOCK_AMOUNT = 20;
 export const MAP_UNLOCK_AMOUNT = 35;
 export const FREE_WILL_COST = 10;
 export const SAVE_KEY = "theCopperCanPrototypeSave";
+export const COMBAT_ARENA_WIDTH = 98;
+export const COMBAT_ARENA_HEIGHT = 16;
+export const COMBAT_TICK_MS = 180;
+export const COMBAT_PLAYER_DAMAGE = 2;
 ```
 
-Useful gameplay behavior also depends on state defaults in `js/gameState.js` and reset/start values in `js/actions.js`.
+Note: `MAP_UNLOCK_AMOUNT` still exists as a tuning constant, but the current visible Map tab is awarded through the Village Hall reward flow.
 
-## Working conventions for a more cohesive directory
+## Verification
 
-If you want this repo to stay easy to grow, these conventions will help:
+The current module graph can be checked with Bun:
 
-1. Treat `js/` as the only runtime source of truth.
-2. Keep render logic in `render.js` and state mutations in `actions.js`.
-3. Put new balancing constants and content definitions in `data.js`.
-4. Put reusable formatting helpers in `helpers.js` instead of duplicating string-building logic.
-5. Keep ASCII art and map text in `asciiArt.js` rather than embedding long art blocks across render functions.
-6. Use `file_dump/` only for exports, snapshots, or legacy references, not active development.
-7. If `file_dump/` is still needed, consider renaming it later to something clearer like `archive/` or `snapshots/`.
+```sh
+bun build js/main.js --outdir /private/tmp/bits_intro_game_check
+```
 
-## Suggested next cleanup
+This is useful after refactors because it catches missing exports/imports across the split render and ASCII modules.
 
-The repo is already moving in a good direction, but the biggest source of confusion is the archive material living next to the active app. The simplest path to a more cohesive directory is:
+## Working Conventions
 
-1. Continue editing only files in `js/`, `css/`, and `index.html`.
-2. Keep `README.md` aligned with the modular architecture, not the old single-file version.
-3. Decide whether `file_dump/` is meant to be an archive, export folder, or backup folder, then rename or document it consistently.
-4. Remove or relocate outdated references to `js/game.js`, since that file is no longer part of the live app.
+1. Treat `js/`, `css/`, `index.html`, and `README.md` as the live project surface.
+2. Leave `backupFolder/` alone unless you intentionally want to update archival snapshots.
+3. Keep state mutations and progression rules in `actions.js`.
+4. Keep screen drawing and event binding in `js/render/`.
+5. Keep shared render exports in `renderHelper.js`.
+6. Keep ASCII assets in `js/asciiArt/` and re-export public assets through `js/asciiArt.js`.
+7. Use `makePreformattedBox()` for spacing-sensitive diagrams such as maps.
+8. Use grouped state helpers in `gameState.js` and `saveSystem.js` for defaults, saves, and legacy migration.
 
-## Current source of truth summary
+## Current Source Of Truth
 
-If you are trying to understand or extend the game quickly, start here:
+Start here when extending the prototype:
 
 - Entry point: `js/main.js`
-- State: `js/gameState.js`
+- State defaults: `js/gameState.js`
 - Game logic: `js/actions.js`
-- Rendering: `js/render.js`
+- Render exports: `js/renderHelper.js`
+- Render modules: `js/render/`
+- ASCII asset exports: `js/asciiArt.js`
+- ASCII modules: `js/asciiArt/`
 - Content and constants: `js/data.js`
 - Persistence: `js/saveSystem.js`
-
-That path will give you the clearest picture of how the prototype works today.

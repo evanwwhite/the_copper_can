@@ -78,3 +78,18 @@ export function makeBox(title, lines = [], width = BOX_TEXT_WIDTH) {
     bottomBorder,
   ].join("\n");
 }
+
+export function makePreformattedBox(title, lines = [], width = BOX_TEXT_WIDTH) {
+  const borderWidth = width + 4;
+  const topBorder = `┌${repeatChar("─", borderWidth)}┐`;
+  const divider = `├${repeatChar("─", borderWidth)}┤`;
+  const bottomBorder = `└${repeatChar("─", borderWidth)}┘`;
+
+  return [
+    topBorder,
+    formatBoxLine(centerText(title, width), width),
+    divider,
+    ...lines.map(line => formatBoxLine(line, width)),
+    bottomBorder,
+  ].join("\n");
+}

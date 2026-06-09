@@ -8,6 +8,7 @@ export function createCombatState() {
     playerX: 2,
     enemyX: 58,
     canExit: false,
+    returnScreen: "game",
     returnView: "map",
     message: "",
     rewardCopperBits: 0,
@@ -40,6 +41,7 @@ export function createInitialGameState() {
     inventory: {
       copperCan: false,
       bentMagnet: false,
+      map: false,
       bentMagnetBitsPerSecond: 1,
     },
 
@@ -61,6 +63,9 @@ export function createInitialGameState() {
       seenTitleReveal: false,
       refusedCopperCan: false,
       ignoredCopperCan: false,
+      acceptedDarkForestChallenge: false,
+      defeatedDarkTreeWatcher: false,
+      receivedVillageMap: false,
     },
 
     lastMessage: "",

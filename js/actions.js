@@ -12,43 +12,48 @@ import {
 import { saveGame, clearSave, hydrateGameState } from "./saveSystem.js";
 
 async function renderGame() {
-  const { renderGameScreen } = await import("./render.js");
+  const { renderGameScreen } = await import("./renderHelper.js");
   renderGameScreen();
 }
 
 async function renderIntro() {
-  const { renderIntroScreen } = await import("./render.js");
+  const { renderIntroScreen } = await import("./renderHelper.js");
   renderIntroScreen();
 }
 
-async function renderMap() {
-  const { renderMapView } = await import("./render.js");
-  renderMapView();
-}
-
 async function renderSave() {
-  const { renderSaveView } = await import("./render.js");
+  const { renderSaveView } = await import("./renderHelper.js");
   renderSaveView();
 }
 
 async function renderTitleReveal() {
-  const { renderTitleRevealScreen } = await import("./render.js");
+  const { renderTitleRevealScreen } = await import("./renderHelper.js");
   renderTitleRevealScreen();
 }
 
 async function renderForestPath() {
-  const { renderForestPathScreen } = await import("./render.js");
+  const { renderForestPathScreen } = await import("./renderHelper.js");
   renderForestPathScreen();
 }
 
 async function renderBlankPath() {
-  const { renderBlankPathScreen } = await import("./render.js");
+  const { renderBlankPathScreen } = await import("./renderHelper.js");
   renderBlankPathScreen();
 }
 
 async function renderTown() {
-  const { renderTownScreen } = await import("./render.js");
+  const { renderTownScreen } = await import("./renderHelper.js");
   renderTownScreen();
+}
+
+async function renderTownInterior() {
+  const { renderTownInteriorScreen } = await import("./renderHelper.js");
+  renderTownInteriorScreen();
+}
+
+async function renderDarkForest() {
+  const { renderDarkForestScreen } = await import("./renderHelper.js");
+  renderDarkForestScreen();
 }
 
 function getCombatEnemy() {
@@ -169,9 +174,13 @@ async function resolveCombatTick() {
 
     if (game.combat.enemyHp === 0) {
       clearCombatTimer();
+      game.combat.active = false;
       game.combat.phase = "victory";
       game.combat.canExit = true;
       game.combat.rewardCopperBits = enemy.rewardCopperBits;
+      if (enemy.id === "darkTreeWatcher") {
+        game.flags.defeatedDarkTreeWatcher = true;
+      }
       game.currencies.copper += enemy.rewardCopperBits;
       game.lastMessage =
         `${enemy.victoryText} You recover ${enemy.rewardCopperBits} copper bits.`;
@@ -247,6 +256,10 @@ export async function switchView(viewName) {
     saveGame();
     await renderGame();
     return;
+  }
+
+  if (game.combat.canExit && viewName !== "combat") {
+    resetCombatState();
   }
 
   game.world.screen = "game";
@@ -426,23 +439,95 @@ export async function continueOnTrail() {
   await renderTown();
 }
 
+export async function enterTownBuilding(buildingId) {
+  game.world.screen = "townInterior";
+  game.world.currentView = buildingId;
+  saveGame();
+  await renderTownInterior();
+}
+
+export async function leaveTownBuilding() {
+  game.world.screen = "town";
+  saveGame();
+  await renderTown();
+}
+
+export async function acceptDarkForestChallenge() {
+  game.flags.acceptedDarkForestChallenge = true;
+  game.world.screen = "town";
+  saveGame();
+  await renderTown();
+}
+
+export async function receiveVillageMap() {
+  if (!game.flags.defeatedDarkTreeWatcher) return;
+
+  game.inventory.map = true;
+  game.unlocks.map = true;
+  game.unlocks.pack = true;
+  game.flags.receivedVillageMap = true;
+  game.lastMessage = "The villager gives you a folded map of the road home.";
+
+  saveGame();
+  await renderTownInterior();
+}
+
+export async function enterDarkForest() {
+  if (!game.flags.acceptedDarkForestChallenge) return;
+
+  game.world.screen = "darkForest";
+  saveGame();
+  await renderDarkForest();
+}
+
+export async function leaveDarkForest() {
+  game.world.screen = "town";
+  saveGame();
+  await renderTown();
+}
+
 export async function visitCopperCan() {
   game.lastMessage = "You return to the copper can.";
   await switchView("can");
 }
 
-export async function visitDarkTrees() {
-  game.lastMessage =
-    "The bent magnet pulls hard toward an old, rusty iron sign.";
+export async function travelToWoodedPath() {
+  game.world.screen = "forestPath";
+  game.lastMessage = "You follow the map back to the wooded path.";
   saveGame();
-  await renderMap();
+  await renderForestPath();
+}
+
+export async function travelToVillage() {
+  game.world.screen = "town";
+  game.lastMessage = "You follow the map back to the village.";
+  saveGame();
+  await renderTown();
 }
 
 export async function startDarkTreeFight() {
   if (game.combat.active) return;
+  if (game.flags.defeatedDarkTreeWatcher) {
+    game.lastMessage = "The rusty iron sign is already broken.";
+    saveGame();
+    if (game.world.screen === "darkForest") {
+      await renderDarkForest();
+      return;
+    }
+
+    await renderGame();
+    return;
+  }
 
   const enemy = combatEnemies.darkTreeWatcher;
+  const returnScreen = game.world.screen === "darkForest"
+    ? "darkForest"
+    : "game";
+  const returnView = returnScreen === "game"
+    ? game.world.currentView
+    : "can";
 
+  game.world.screen = "game";
   game.world.currentView = "combat";
   game.combat = {
     ...createCombatState(),
@@ -453,7 +538,8 @@ export async function startDarkTreeFight() {
     enemyMaxHp: enemy.maxHealth,
     playerX: 2,
     enemyX: COMBAT_ARENA_WIDTH - 12,
-    returnView: "map",
+    returnScreen,
+    returnView,
     message: enemy.introText,
   };
 
@@ -465,12 +551,20 @@ export async function startDarkTreeFight() {
 export async function exitCombat() {
   if (!game.combat.canExit) return;
 
+  const returnScreen = game.combat.returnScreen || "game";
   const returnView = game.combat.returnView || "map";
 
   resetCombatState();
+  game.world.screen = returnScreen;
   game.world.currentView = returnView;
 
   saveGame();
+
+  if (returnScreen === "darkForest") {
+    await renderDarkForest();
+    return;
+  }
+
   await renderGame();
 }
 
