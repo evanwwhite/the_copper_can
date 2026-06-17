@@ -1,5 +1,5 @@
 import { game } from "../gameState.js";
-import { copperCanTitleArt, introTitleArt } from "../asciiArt.js";
+import { copperCanTitleArt, introTitleArt } from "../asciiArtHelper.js";
 import { saveGame } from "../saveSystem.js";
 import { continueFromTitleReveal, startNewGame } from "../actions.js";
 import { mainContent, setMainContentMode, statusBar } from "./dom.js";

@@ -5,6 +5,7 @@ import {
   FREE_WILL_COST,
   MAP_UNLOCK_AMOUNT,
 } from "../data.js";
+import { copperCan } from "../asciiArt/titles.js";
 import { makeBox } from "../helpers.js";
 import {
   buyBentMagnet,
@@ -17,10 +18,10 @@ import {
   throwBitsOnGround,
   unlockMap,
 } from "../actions.js";
-import { mainContent, setMainContentMode } from "./dom.js";
+import { escapeHtml, mainContent, setMainContentMode } from "./dom.js";
 
 export function renderCopperCanView() {
-  setMainContentMode();
+  setMainContentMode("copperCanView");
   const canLines = [`Copper bits: ${game.currencies.copper}`];
 
   if (game.unlocks.silverBits) {
@@ -167,7 +168,8 @@ ${makeBox("MESSAGE", [game.lastMessage])}
 `;
   }
 
-  mainContent.innerHTML = content;
+  mainContent.innerHTML =
+    `${content}<span class="copperCanPageArt">${escapeHtml(copperCan)}</span>`;
 
   const gatherBitButton = document.getElementById("gatherBitButton");
   if (gatherBitButton) {

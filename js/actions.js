@@ -56,6 +56,19 @@ async function renderDarkForest() {
   renderDarkForestScreen();
 }
 
+async function refreshCopperCounter() {
+  if (game.world.screen === "game") {
+    await renderGame();
+    return;
+  }
+
+  const { attachTopBarListeners, renderTopBar } = await import(
+    "./renderHelper.js"
+  );
+  renderTopBar();
+  attachTopBarListeners();
+}
+
 function getCombatEnemy() {
   if (!game.combat.enemyId) return null;
   return combatEnemies[game.combat.enemyId] ?? null;
@@ -213,14 +226,12 @@ export function startTimer() {
   if (runtime.timerId !== null) return;
 
   runtime.timerId = window.setInterval(async () => {
-    if (game.world.screen !== "game") return;
-
     if (game.inventory.bentMagnet) {
       game.currencies.copper += game.inventory.bentMagnetBitsPerSecond;
       unlockBasicsAfterFirstBit();
       checkForTitleReveal();
       saveGame();
-      await renderGame();
+      await refreshCopperCounter();
     }
   }, 1000);
 }
@@ -476,6 +487,7 @@ export async function enterDarkForest() {
   if (!game.flags.acceptedDarkForestChallenge) return;
 
   game.world.screen = "darkForest";
+  game.world.darkForestSceneIndex = 0;
   saveGame();
   await renderDarkForest();
 }

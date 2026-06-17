@@ -3,7 +3,7 @@ import {
   buildMapScreenLines,
   forest,
   forestTrailSignScene,
-} from "../asciiArt.js";
+} from "../asciiArtHelper.js";
 import { makePreformattedBox } from "../helpers.js";
 import { saveGame } from "../saveSystem.js";
 import {

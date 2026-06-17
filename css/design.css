@@ -44,6 +44,18 @@ pre {
   min-width: 900px;
 }
 
+#mainContent.copperCanView {
+  position: relative;
+  min-width: 980px;
+}
+
+.copperCanPageArt {
+  position: absolute;
+  top: 0;
+  left: 620px;
+  white-space: pre;
+}
+
 #versionNumber {
   position: fixed;
   bottom: 0;

@@ -5,7 +5,7 @@ import {
   copperCanAsset,
   inventoryScreenMassive,
   mapAsset,
-} from "../asciiArt.js";
+} from "../asciiArtHelper.js";
 import { thoughts } from "../data.js";
 import { makeBox } from "../helpers.js";
 import { manualSave, resetPrototype, switchView } from "../actions.js";

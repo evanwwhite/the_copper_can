@@ -9,10 +9,11 @@ import {
   renderTownInteriorScreen,
   renderTownScreen,
 } from "./renderHelper.js";
-import { continueGame } from "./actions.js";
+import { continueGame, startTimer } from "./actions.js";
 
 function boot() {
   loadGame();
+  startTimer();
 
   if (game.world.screen === "game") {
     continueGame();

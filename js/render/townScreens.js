@@ -1,5 +1,5 @@
 import { game } from "../gameState.js";
-import { townScene, villagerSmall } from "../asciiArt.js";
+import { townScene, villagerSmall } from "../asciiArtHelper.js";
 import { makeBox } from "../helpers.js";
 import { saveGame } from "../saveSystem.js";
 import {

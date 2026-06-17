@@ -8,7 +8,7 @@ import {
   darkTreeWatcherArt,
   darkTreeWatcherDeadArt,
   playerCombatArt,
-} from "../asciiArt.js";
+} from "../asciiArtHelper.js";
 import { makePreformattedBox, wrapText } from "../helpers.js";
 import { exitCombat } from "../actions.js";
 import { getSpriteWidth, placeSprite } from "./ascii.js";

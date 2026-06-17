@@ -24,6 +24,7 @@ export function createInitialGameState() {
     world: {
       screen: "intro",
       currentView: "can",
+      darkForestSceneIndex: 0,
       nextScreenAfterTitleReveal: null,
     },
 

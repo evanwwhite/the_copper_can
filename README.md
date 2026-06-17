@@ -49,7 +49,7 @@ bits_intro_game/
 │   └── design.css
 ├── js/
 │   ├── actions.js
-│   ├── asciiArt.js
+│   ├── asciiArtHelper.js
 │   ├── asciiArt/
 │   │   ├── combatSprites.js
 │   │   ├── composition.js
@@ -106,7 +106,7 @@ The active application code.
 - `actions.js`: player actions, state mutations, combat flow, route changes, reward handling, saving, and resetting
 - `renderHelper.js`: barrel export for the render modules
 - `render/`: focused render modules for the top bar, game view, world screens, town screens, combat, pack/thoughts/save/settings, intro/title screens, and shared DOM/ASCII helpers
-- `asciiArt.js`: barrel export for ASCII assets
+- `asciiArtHelper.js`: barrel export for ASCII assets
 - `asciiArt/`: focused ASCII modules for titles, inventory items, map art/data, thoughts screen layout, forest scenes, town scenes, nature sprites, combat sprites, and composition helpers
 - `saveSystem.js`: grouped save serialization, hydration, and legacy save migration
 - `helpers.js`: text wrapping, centering, and ASCII box helpers
@@ -224,7 +224,7 @@ This is useful after refactors because it catches missing exports/imports across
 3. Keep state mutations and progression rules in `actions.js`.
 4. Keep screen drawing and event binding in `js/render/`.
 5. Keep shared render exports in `renderHelper.js`.
-6. Keep ASCII assets in `js/asciiArt/` and re-export public assets through `js/asciiArt.js`.
+6. Keep ASCII assets in `js/asciiArt/` and re-export public assets through `js/asciiArtHelper.js`.
 7. Use `makePreformattedBox()` for spacing-sensitive diagrams such as maps.
 8. Use grouped state helpers in `gameState.js` and `saveSystem.js` for defaults, saves, and legacy migration.
 
@@ -237,7 +237,7 @@ Start here when extending the prototype:
 - Game logic: `js/actions.js`
 - Render exports: `js/renderHelper.js`
 - Render modules: `js/render/`
-- ASCII asset exports: `js/asciiArt.js`
+- ASCII asset exports: `js/asciiArtHelper.js`
 - ASCII modules: `js/asciiArt/`
 - Content and constants: `js/data.js`
 - Persistence: `js/saveSystem.js`
