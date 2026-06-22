@@ -43,3 +43,21 @@ export const mapAsset = String.raw`
 | MAP |
 '~~~~~'
 `;
+
+export const slingshotAsset = String.raw`
+ \_/
+  |
+  Y
+`;
+
+export const bootsAsset = [
+  '        ',
+  ' |"||"| ',
+  ' |___]__]',
+];
+
+export const swordAsset = String.raw`
+ |
+ |
+{|}
+`;

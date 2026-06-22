@@ -147,6 +147,7 @@ ${makeBox("DISTANT BUZZING", [
   if (
     game.inventory.bentMagnet &&
     game.flags.disturbedBeehive &&
+    !game.flags.reachedWoodedPath &&
     game.currencies.copper >= MAP_UNLOCK_AMOUNT
   ) {
     content += `

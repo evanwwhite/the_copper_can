@@ -1,31 +1,74 @@
 import { game } from "../gameState.js";
 import {
   bentMagnetAsset,
+  bootsAsset,
   buildThoughtsScreenArt,
   copperCanAsset,
   inventoryScreenMassive,
   mapAsset,
+  slingshotAsset,
+  swordAsset,
 } from "../asciiArtHelper.js";
 import { thoughts } from "../data.js";
 import { makeBox } from "../helpers.js";
 import { manualSave, resetPrototype, switchView } from "../actions.js";
-import { overlayAsciiArt } from "./ascii.js";
+import { overlayAsciiArt, toArtLines } from "./ascii.js";
 import { escapeHtml, mainContent, setMainContentMode } from "./dom.js";
 
+// Geometry of the top item grid in inventoryScreenMassive. Each cell interior
+// is 9 columns wide and 3 rows tall; the six cells start at these columns.
+const PACK_GRID = {
+  cellTop: 4,
+  cellHeight: 3,
+  cellWidth: 9,
+  columnStarts: [3, 13, 23, 33, 43, 53],
+};
+
+// Returns an overlay placement for the asset within the grid cell at the given
+// column index. Array assets are hand-positioned: they're anchored at the
+// cell's top-left so the author's literal spacing controls the offset. String
+// assets are auto-centered by their content bounding box.
+function centerInCell(art, columnIndex) {
+  const cellStart = PACK_GRID.columnStarts[columnIndex];
+
+  if (Array.isArray(art)) {
+    return { art, x: cellStart, y: PACK_GRID.cellTop };
+  }
+
+  const lines = toArtLines(art);
+
+  let minCol = Infinity;
+  let maxCol = -Infinity;
+  lines.forEach((line) => {
+    const firstNonSpace = line.search(/\S/);
+    if (firstNonSpace === -1) return;
+    const lastNonSpace = line.replace(/\s+$/, "").length - 1;
+    minCol = Math.min(minCol, firstNonSpace);
+    maxCol = Math.max(maxCol, lastNonSpace);
+  });
+
+  const contentWidth = maxCol - minCol + 1;
+  const x =
+    cellStart + Math.floor((PACK_GRID.cellWidth - contentWidth) / 2) - minCol;
+  const y =
+    PACK_GRID.cellTop + Math.floor((PACK_GRID.cellHeight - lines.length) / 2);
+
+  return { art, x, y };
+}
+
 function buildPackInventoryArt() {
-  const overlays = [];
+  const items = [
+    { has: game.inventory.copperCan, art: copperCanAsset },
+    { has: game.inventory.bentMagnet, art: bentMagnetAsset },
+    { has: game.inventory.map, art: mapAsset },
+    { has: game.inventory.slingshot, art: slingshotAsset },
+    { has: game.inventory.boots, art: bootsAsset },
+    { has: game.inventory.sword, art: swordAsset },
+  ];
 
-  if (game.inventory.copperCan) {
-    overlays.push({ art: copperCanAsset, x: 4, y: 4 });
-  }
-
-  if (game.inventory.bentMagnet) {
-    overlays.push({ art: bentMagnetAsset, x: 14, y: 4 });
-  }
-
-  if (game.inventory.map) {
-    overlays.push({ art: mapAsset, x: 24, y: 4 });
-  }
+  const overlays = items
+    .map((item, index) => (item.has ? centerInCell(item.art, index) : null))
+    .filter(Boolean);
 
   return overlayAsciiArt(inventoryScreenMassive, overlays);
 }

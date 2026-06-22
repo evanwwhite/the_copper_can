@@ -47,12 +47,13 @@ pre {
 #mainContent.copperCanView {
   position: relative;
   min-width: 980px;
+  padding-left: 180px;
 }
 
 .copperCanPageArt {
   position: absolute;
-  top: 0;
-  left: 620px;
+  top: 110px;
+  left: 770px;
   white-space: pre;
 }
 
@@ -100,6 +101,29 @@ pre {
 
 .townBuildingHover:hover {
   background-color: #eeeeee;
+}
+
+.mapNodeEnabled {
+  cursor: pointer;
+}
+
+.mapNodeEnabled:hover .mapNodeLine {
+  background-color: #eeebe7;
+}
+
+.mapNodeDisabled {
+  color: #9a9a9a;
+}
+
+.worldMapScene {
+  display: inline-block;
+  white-space: pre;
+  font-size: 1em;
+  /* Tight leading so the one-stroke-per-row coastline reads as a continuous
+     line rather than dotted dashes. Tune together with the island art. */
+  line-height: 1.2;
+  letter-spacing: .1;
+  text-align: center;
 }
 
 .darkTreeWatcherSprite {

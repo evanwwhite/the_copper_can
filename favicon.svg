@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" shape-rendering="crispEdges">
+  <rect width="32" height="32" rx="6" fill="#1c2118"/>
+  <!-- copper can body (larger, centered) -->
+  <g>
+    <!-- body -->
+    <path d="M6 9 h20 v17 a10 4 0 0 1 -20 0 z" fill="#b87333"/>
+    <!-- body shading -->
+    <path d="M19 9 h7 v17 a10 4 0 0 1 -7 3.4 z" fill="#9c5e26"/>
+    <!-- vertical highlight -->
+    <rect x="9" y="10" width="2" height="16" fill="#e09a55"/>
+    <!-- can lip / top rim -->
+    <ellipse cx="16" cy="9" rx="10" ry="4" fill="#d98f43"/>
+    <ellipse cx="16" cy="9" rx="10" ry="4" fill="none" stroke="#7a4a1d" stroke-width="0.9"/>
+    <!-- inner opening -->
+    <ellipse cx="16" cy="9" rx="6.6" ry="2.5" fill="#5a3413"/>
+  </g>
+</svg>

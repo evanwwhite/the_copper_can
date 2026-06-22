@@ -14,6 +14,8 @@ export function renderIntroScreen() {
   mainContent.innerHTML = String.raw`
 
 
+
+
 ${introTitleArt}
 
                      You wake beneath a wet green canopy.
@@ -47,19 +49,21 @@ export function renderTitleRevealScreen() {
   mainContent.innerHTML = String.raw`
 
 
+
+
 ${copperCanTitleArt}
 
-                         The can, the magnet, the thoughts...
+                                  The can, the magnet, the thoughts...
 
-                         They were not separate things.
+                                     They were not separate things.
 
-                         They were the beginning of something.
-
-
-                            THE COPPER CAN
+                                They were the beginning of something.
 
 
-                                 <span id="continueButton" class="asciiRealButton">Continue</span>
+                                             THE COPPER CAN
+
+
+                                              <span id="continueButton" class="asciiRealButton">Continue</span>
 
 
 `;

@@ -10,11 +10,15 @@ import {
   playerCombatArt,
 } from "../asciiArtHelper.js";
 import { makePreformattedBox, wrapText } from "../helpers.js";
-import { exitCombat } from "../actions.js";
+import { exitCombat, returnToTownAfterDefeat } from "../actions.js";
 import { getSpriteWidth, placeSprite } from "./ascii.js";
 import { escapeHtml, mainContent, setMainContentMode } from "./dom.js";
 
 function getCombatEnemyArt() {
+  if (game.combat.defeated) {
+    return darkTreeWatcherArt;
+  }
+
   if (game.combat.canExit || game.combat.enemyHp === 0) {
     return darkTreeWatcherDeadArt;
   }
@@ -56,11 +60,13 @@ export function renderCombatView() {
     return;
   }
 
-  const phaseLabel = game.combat.canExit
-    ? "Victory"
-    : game.combat.phase === "approach"
-      ? "Approach"
-      : "Clash";
+  const phaseLabel = game.combat.defeated
+    ? "Defeat"
+    : game.combat.canExit
+      ? "Victory"
+      : game.combat.phase === "approach"
+        ? "Approach"
+        : "Clash";
 
   const combatLines = [
     `Enemy: ${enemy.name}`,
@@ -77,9 +83,10 @@ ${escapeHtml(makePreformattedBox("FIGHT", combatLines, COMBAT_ARENA_WIDTH))}
 `;
 
   if (game.combat.canExit) {
+    const exitLabel = game.combat.defeated ? "Return to town" : "Exit fight";
     content += `
 
-    <span id="exitCombatButton" class="asciiRealButton">Exit fight</span>
+    <span id="exitCombatButton" class="asciiRealButton">${exitLabel}</span>
 
 `;
   }
@@ -88,6 +95,9 @@ ${escapeHtml(makePreformattedBox("FIGHT", combatLines, COMBAT_ARENA_WIDTH))}
 
   const exitCombatButton = document.getElementById("exitCombatButton");
   if (exitCombatButton) {
-    exitCombatButton.addEventListener("click", exitCombat);
+    exitCombatButton.addEventListener(
+      "click",
+      game.combat.defeated ? returnToTownAfterDefeat : exitCombat,
+    );
   }
 }

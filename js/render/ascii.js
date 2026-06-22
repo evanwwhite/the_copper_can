@@ -1,8 +1,23 @@
+// Removes fully-blank leading/trailing lines while preserving the
+// indentation of content lines (unlike String.prototype.trim, which would
+// strip leading spaces off the first line and misalign indented art).
+export function stripBlankEdgeLines(text) {
+  return text.replace(/^(?:[ \t]*\n)+/, "").replace(/(?:\n[ \t]*)+$/, "");
+}
+
+// Normalizes an asset into an array of lines. An array is treated as
+// hand-authored and returned verbatim (its blank lines and spaces are
+// significant); a string has blank leading/trailing lines stripped.
+export function toArtLines(art) {
+  if (Array.isArray(art)) return art;
+  return stripBlankEdgeLines(art).split("\n");
+}
+
 export function overlayAsciiArt(baseArt, overlays) {
   const lines = baseArt.trim().split("\n").map(line => [...line]);
 
   overlays.forEach(({ art, x, y }) => {
-    art.trim().split("\n").forEach((artLine, artY) => {
+    toArtLines(art).forEach((artLine, artY) => {
       [...artLine].forEach((character, artX) => {
         if (character === " ") return;
 

@@ -2,11 +2,18 @@ import { createCombatState, game, runtime } from "./gameState.js";
 import {
   BEEHIVE_UNLOCK_AMOUNT,
   BENT_MAGNET_COST,
+  BOOTS_COST,
+  BOOTS_DAMAGE_REDUCTION,
   COMBAT_ARENA_WIDTH,
   COMBAT_MOVE_STEP,
   COMBAT_PLAYER_DAMAGE,
   COMBAT_TICK_MS,
   FREE_WILL_COST,
+  INN_REST_COST,
+  SLINGSHOT_APPROACH_DAMAGE,
+  SLINGSHOT_COST,
+  SWORD_ATTACK_BONUS,
+  SWORD_COST,
   combatEnemies,
 } from "./data.js";
 import { saveGame, clearSave, hydrateGameState } from "./saveSystem.js";
@@ -72,6 +79,15 @@ async function refreshCopperCounter() {
 function getCombatEnemy() {
   if (!game.combat.enemyId) return null;
   return combatEnemies[game.combat.enemyId] ?? null;
+}
+
+export function getPlayerCombatStats() {
+  return {
+    attackDamage:
+      COMBAT_PLAYER_DAMAGE + (game.inventory.sword ? SWORD_ATTACK_BONUS : 0),
+    damageReduction: game.inventory.boots ? BOOTS_DAMAGE_REDUCTION : 0,
+    approachDamage: game.inventory.slingshot ? SLINGSHOT_APPROACH_DAMAGE : 0,
+  };
 }
 
 function clearCombatTimer() {
@@ -162,6 +178,31 @@ function resolveApproachPhase(enemy) {
   return game.combat.enemyX - game.combat.playerX <= stopDistance;
 }
 
+function resolveCombatVictory(enemy) {
+  clearCombatTimer();
+  game.combat.active = false;
+  game.combat.phase = "victory";
+  game.combat.canExit = true;
+  game.combat.rewardCopperBits = enemy.rewardCopperBits;
+  if (enemy.id === "darkTreeWatcher") {
+    game.flags.defeatedDarkTreeWatcher = true;
+  }
+  game.currencies.copper += enemy.rewardCopperBits;
+  game.lastMessage =
+    `${enemy.victoryText} You recover ${enemy.rewardCopperBits} copper bits.`;
+  game.combat.message = "The path out of the fight is clear now.";
+}
+
+function resolveCombatDefeat() {
+  clearCombatTimer();
+  game.combat.active = false;
+  game.combat.phase = "defeat";
+  game.combat.canExit = true;
+  game.combat.defeated = true;
+  game.combat.rewardCopperBits = 0;
+  game.combat.message = "You are beaten back. There is no shame in retreat.";
+}
+
 async function resolveCombatTick() {
   const enemy = getCombatEnemy();
 
@@ -172,8 +213,27 @@ async function resolveCombatTick() {
     return;
   }
 
+  const stats = getPlayerCombatStats();
+
   if (game.combat.phase === "approach") {
     game.combat.message = enemy.approachText;
+
+    if (stats.approachDamage > 0) {
+      game.combat.enemyHp = Math.max(
+        0,
+        game.combat.enemyHp - stats.approachDamage,
+      );
+      game.combat.message =
+        `${enemy.approachText} Your slingshot stings it for ` +
+        `${stats.approachDamage} damage. ${game.combat.enemyHp} enemy health remains.`;
+
+      if (game.combat.enemyHp === 0) {
+        resolveCombatVictory(enemy);
+        saveGame();
+        await renderGame();
+        return;
+      }
+    }
 
     if (resolveApproachPhase(enemy)) {
       game.combat.phase = "attack";
@@ -182,29 +242,26 @@ async function resolveCombatTick() {
   } else if (game.combat.phase === "attack") {
     game.combat.enemyHp = Math.max(
       0,
-      game.combat.enemyHp - COMBAT_PLAYER_DAMAGE,
+      game.combat.enemyHp - stats.attackDamage,
     );
 
     if (game.combat.enemyHp === 0) {
-      clearCombatTimer();
-      game.combat.active = false;
-      game.combat.phase = "victory";
-      game.combat.canExit = true;
-      game.combat.rewardCopperBits = enemy.rewardCopperBits;
-      if (enemy.id === "darkTreeWatcher") {
-        game.flags.defeatedDarkTreeWatcher = true;
-      }
-      game.currencies.copper += enemy.rewardCopperBits;
-      game.lastMessage =
-        `${enemy.victoryText} You recover ${enemy.rewardCopperBits} copper bits.`;
-      game.combat.message = "The path out of the fight is clear now.";
+      resolveCombatVictory(enemy);
     } else {
-      game.player.health = Math.max(0, game.player.health - enemy.attackDamage);
+      const damageTaken = Math.max(
+        0,
+        enemy.attackDamage - stats.damageReduction,
+      );
+      game.player.health = Math.max(0, game.player.health - damageTaken);
 
-      game.combat.message =
-        `${enemy.attackText} You take ${enemy.attackDamage} damage. ` +
-        `${game.combat.enemyHp} enemy health remains. ` +
-        `Your health is now ${game.player.health}/${game.player.maxHealth}.`;
+      if (game.player.health === 0) {
+        resolveCombatDefeat();
+      } else {
+        game.combat.message =
+          `${enemy.attackText} You take ${damageTaken} damage. ` +
+          `${game.combat.enemyHp} enemy health remains. ` +
+          `Your health is now ${game.player.health}/${game.player.maxHealth}.`;
+      }
     }
   }
 
@@ -463,6 +520,79 @@ export async function leaveTownBuilding() {
   await renderTown();
 }
 
+async function buyGear(itemKey, cost, successMessage, { render = true } = {}) {
+  let purchased = false;
+
+  if (game.inventory[itemKey]) {
+    game.lastMessage = "You already own that.";
+  } else if (game.currencies.copper < cost) {
+    game.lastMessage = `You need ${cost} copper bits for that.`;
+  } else {
+    game.currencies.copper -= cost;
+    game.inventory[itemKey] = true;
+    game.lastMessage = successMessage;
+    purchased = true;
+  }
+
+  if (render) {
+    saveGame();
+    await renderTownInterior();
+  }
+
+  return purchased;
+}
+
+export async function buySlingshot() {
+  await buyGear(
+    "slingshot",
+    SLINGSHOT_COST,
+    "A worn slingshot is yours. It stings foes as they approach.",
+  );
+}
+
+export async function buyBoots() {
+  await buyGear(
+    "boots",
+    BOOTS_COST,
+    "Sturdy boots are yours. Blows land softer now.",
+  );
+}
+
+export async function buySword() {
+  const purchased = await buyGear(
+    "sword",
+    SWORD_COST,
+    "A keen-edged sword is yours. Your strikes bite deeper.",
+    { render: false },
+  );
+
+  if (purchased && !game.flags.unlockedWorldMap) {
+    game.flags.unlockedWorldMap = true;
+    game.lastMessage =
+      'The blacksmith presses the blade into your hands. ' +
+      '"The world is dangerous out here. Take this." ' +
+      "A wider map of the world unfolds in your mind.";
+  }
+
+  saveGame();
+  await renderTownInterior();
+}
+
+export async function restAtInn() {
+  if (game.player.health >= game.player.maxHealth) {
+    game.lastMessage = "You are already at full health.";
+  } else if (game.currencies.copper < INN_REST_COST) {
+    game.lastMessage = `You need ${INN_REST_COST} copper bits to rent a room.`;
+  } else {
+    game.currencies.copper -= INN_REST_COST;
+    game.player.health = game.player.maxHealth;
+    game.lastMessage = "You rest by the fire and wake fully restored.";
+  }
+
+  saveGame();
+  await renderTownInterior();
+}
+
 export async function acceptDarkForestChallenge() {
   game.flags.acceptedDarkForestChallenge = true;
   game.world.screen = "town";
@@ -503,6 +633,11 @@ export async function visitCopperCan() {
   await switchView("can");
 }
 
+export async function viewWorldMap() {
+  if (!game.flags.unlockedWorldMap) return;
+  await switchView("worldMap");
+}
+
 export async function travelToWoodedPath() {
   game.world.screen = "forestPath";
   game.lastMessage = "You follow the map back to the wooded path.";
@@ -520,7 +655,7 @@ export async function travelToVillage() {
 export async function startDarkTreeFight() {
   if (game.combat.active) return;
   if (game.flags.defeatedDarkTreeWatcher) {
-    game.lastMessage = "The rusty iron sign is already broken.";
+    game.lastMessage = "The fox has already been driven off.";
     saveGame();
     if (game.world.screen === "darkForest") {
       await renderDarkForest();
@@ -560,8 +695,33 @@ export async function startDarkTreeFight() {
   await renderGame();
 }
 
+export async function returnToTownAfterDefeat() {
+  if (!game.combat.defeated) return;
+
+  resetCombatState();
+
+  if (!game.flags.defeatedDarkTreeWatcher) {
+    game.player.health = game.player.maxHealth;
+    game.lastMessage =
+      "You wake at the edge of the village, patched up by worried hands. " +
+      "Try the fox again when you are ready.";
+  } else {
+    game.lastMessage =
+      "You limp back into the village. Rest at the Riverside Inn to recover your strength.";
+  }
+
+  game.world.screen = "town";
+  saveGame();
+  await renderTown();
+}
+
 export async function exitCombat() {
   if (!game.combat.canExit) return;
+
+  if (game.combat.defeated) {
+    await returnToTownAfterDefeat();
+    return;
+  }
 
   const returnScreen = game.combat.returnScreen || "game";
   const returnView = game.combat.returnView || "map";

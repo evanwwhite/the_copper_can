@@ -4,9 +4,12 @@ export {
 } from "./asciiArt/titles.js";
 export {
   bentMagnetAsset,
+  bootsAsset,
   copperCanAsset,
   inventoryScreenMassive,
   mapAsset,
+  slingshotAsset,
+  swordAsset,
 } from "./asciiArt/inventory.js";
 export {
   darkTreeWatcherArt,
@@ -15,8 +18,8 @@ export {
   playerCombatArt,
 } from "./asciiArt/combatSprites.js";
 export {
-  buildMapScreenLines,
-  mapLines,
+  buildMapScreenModel,
+  islandWorld,
 } from "./asciiArt/map.js";
 export {
   buildThoughtsScreenArt,
@@ -50,3 +53,23 @@ export {
 export {
   townScene,
 } from "./asciiArt/townScene.js";
+export {
+  anvil,
+  balance,
+  banner,
+  barrel,
+  bed,
+  coalPile,
+  counter,
+  fireplace,
+  furnace,
+  hammer,
+  marketStall,
+  mug,
+  potions,
+  shelf,
+  table,
+  throne,
+  tongs,
+  weaponRack,
+} from "./asciiArt/interiorFurniture.js";

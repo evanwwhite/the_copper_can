@@ -8,6 +8,7 @@ export function createCombatState() {
     playerX: 2,
     enemyX: 58,
     canExit: false,
+    defeated: false,
     returnScreen: "game",
     returnView: "map",
     message: "",
@@ -43,6 +44,9 @@ export function createInitialGameState() {
       copperCan: false,
       bentMagnet: false,
       map: false,
+      slingshot: false,
+      boots: false,
+      sword: false,
       bentMagnetBitsPerSecond: 1,
     },
 
@@ -67,6 +71,7 @@ export function createInitialGameState() {
       acceptedDarkForestChallenge: false,
       defeatedDarkTreeWatcher: false,
       receivedVillageMap: false,
+      unlockedWorldMap: false,
     },
 
     lastMessage: "",

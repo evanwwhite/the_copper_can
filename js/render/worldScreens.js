@@ -1,79 +1,140 @@
 import { game } from "../gameState.js";
 import {
-  buildMapScreenLines,
+  buildMapScreenModel,
   forest,
   forestTrailSignScene,
+  islandWorld,
 } from "../asciiArtHelper.js";
-import { makePreformattedBox } from "../helpers.js";
+import { centerText, repeatChar } from "../helpers.js";
 import { saveGame } from "../saveSystem.js";
 import {
   continueOnTrail,
   enterDarkForest,
   followWoodedPath,
   startDarkTreeFight,
+  switchView,
   travelToVillage,
   travelToWoodedPath,
+  viewWorldMap,
   visitCopperCan,
 } from "../actions.js";
-import { mainContent, setMainContentMode } from "./dom.js";
+import { escapeHtml, mainContent, setMainContentMode } from "./dom.js";
 import { attachTopBarListeners, renderTopBar } from "./topBar.js";
+
+const MAP_NODE_INDENT = 14;
+
+const MAP_NODE_ACTIONS = {
+  visitCopperCan,
+  travelToWoodedPath,
+  travelToVillage,
+  enterDarkForest,
+  viewWorldMap,
+  fightDarkTrees: startDarkTreeFight,
+};
+
+function buildMapNodeMarkup(node, innerWidth) {
+  const indent = repeatChar(" ", MAP_NODE_INDENT);
+  const topBorder = `┌${repeatChar("─", innerWidth)}┐`;
+  const labelLine = `│${centerText(node.label, innerWidth)}│`;
+  const bottomBorder = `└${repeatChar("─", innerWidth)}┘`;
+  const line = text => `<span class="mapNodeLine">${escapeHtml(text)}</span>`;
+  const classes = node.enabled
+    ? "mapNode mapNodeEnabled"
+    : "mapNode mapNodeDisabled";
+  const actionAttr = node.enabled
+    ? ` data-map-action="${escapeHtml(node.action)}"`
+    : "";
+
+  return (
+    `<span class="${classes}"${actionAttr}>` +
+    `${indent}${line(topBorder)}\n` +
+    `${indent}${line(labelLine)}\n` +
+    `${indent}${line(bottomBorder)}</span>`
+  );
+}
+
+function buildMapSceneMarkup(model) {
+  const nodeTotalWidth = model.nodeInnerWidth + 2;
+  const connectorPrefix = repeatChar(
+    " ",
+    MAP_NODE_INDENT + Math.floor(nodeTotalWidth / 2),
+  );
+
+  const lines = [];
+  model.nodes.forEach(node => {
+    if (node.connectorAbove) {
+      node.connectorAbove.forEach(character => {
+        lines.push(`${connectorPrefix}${escapeHtml(character)}`);
+      });
+    }
+    lines.push(buildMapNodeMarkup(node, model.nodeInnerWidth));
+  });
+
+  const description = model.descriptionLines
+    .map(line => escapeHtml(line))
+    .join("\n");
+
+  return (
+    `<span id="mapScene" class="mapScene">\n` +
+    `${lines.join("\n")}\n\n\n` +
+    `${description}` +
+    `</span>`
+  );
+}
+
+function attachMapSceneListeners() {
+  const mapScene = document.getElementById("mapScene");
+  if (!mapScene) {
+    return;
+  }
+
+  mapScene.addEventListener("click", event => {
+    const target = event.target instanceof Element
+      ? event.target.closest("[data-map-action]")
+      : null;
+
+    if (!target || !mapScene.contains(target)) {
+      return;
+    }
+
+    const handler = MAP_NODE_ACTIONS[target.dataset.mapAction];
+    if (handler) {
+      handler();
+    }
+  });
+}
 
 export function renderMapView() {
   setMainContentMode();
-  const mapLines = buildMapScreenLines({
+  const model = buildMapScreenModel({
     hasReachedTown: game.flags.acceptedDarkForestChallenge ||
       game.flags.defeatedDarkTreeWatcher ||
       game.flags.receivedVillageMap,
     hasAcceptedDarkForestChallenge: game.flags.acceptedDarkForestChallenge,
     hasDefeatedDarkTreeWatcher: game.flags.defeatedDarkTreeWatcher,
+    hasUnlockedWorldMap: game.flags.unlockedWorldMap,
   });
-  const darkForestButton = game.flags.acceptedDarkForestChallenge
-    ? '<span id="enterDarkForestButton" class="asciiRealButton">Enter the dark forest</span>'
-    : "";
-  const rustySignButton = game.flags.defeatedDarkTreeWatcher
-    ? ""
-    : '<span id="fightDarkTreesButton" class="asciiRealButton">Face the rusty iron sign</span>';
 
   mainContent.innerHTML = `
-${makePreformattedBox("MAP", mapLines)}
-
-
-    <span id="visitCopperCanButton" class="asciiRealButton">Visit the copper can</span>
-
-
-    <span id="visitWoodedPathButton" class="asciiRealButton">Walk to the wooded path</span>
-
-
-    <span id="visitVillageButton" class="asciiRealButton">Return to the village</span>
-
-
-    ${darkForestButton}
-
-
-    ${rustySignButton}
-
+${buildMapSceneMarkup(model)}
 `;
 
-  document
-    .getElementById("visitCopperCanButton")
-    .addEventListener("click", visitCopperCan);
-  document
-    .getElementById("visitWoodedPathButton")
-    .addEventListener("click", travelToWoodedPath);
-  document
-    .getElementById("visitVillageButton")
-    .addEventListener("click", travelToVillage);
+  attachMapSceneListeners();
+}
 
-  const enterDarkForestButton = document.getElementById(
-    "enterDarkForestButton",
-  );
-  if (enterDarkForestButton) {
-    enterDarkForestButton.addEventListener("click", enterDarkForest);
-  }
+export function renderWorldMapView() {
+  setMainContentMode();
 
-  const fightDarkTreesButton = document.getElementById("fightDarkTreesButton");
-  if (fightDarkTreesButton) {
-    fightDarkTreesButton.addEventListener("click", startDarkTreeFight);
+  mainContent.innerHTML = `
+<span class="worldMapScene">${escapeHtml(islandWorld)}</span>
+
+
+    <span id="leaveWorldMapButton" class="asciiRealButton">Back to the map</span>
+`;
+
+  const leaveWorldMapButton = document.getElementById("leaveWorldMapButton");
+  if (leaveWorldMapButton) {
+    leaveWorldMapButton.addEventListener("click", () => switchView("map"));
   }
 }
 

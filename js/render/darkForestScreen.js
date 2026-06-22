@@ -20,6 +20,7 @@ import { attachTopBarListeners, renderTopBar } from "./topBar.js";
 const DARK_FOREST_SCENE_WIDTH = 112;
 const DARK_FOREST_SCENE_HEIGHT = 29;
 const DARK_FOREST_SCENE_COUNT = 3;
+const DARK_FOREST_WATCHER_SCENE_INDEX = 2;
 
 const DARK_FOREST_WATCHER_POSITION = {
   x: 41,
@@ -239,13 +240,15 @@ function createDarkForestSceneLines() {
   const sceneIndex = getDarkForestSceneIndex();
 
   if (sceneIndex === 1) return createPineHollowSceneLines();
-  if (sceneIndex === 2) return createOldRootSceneLines();
+  if (sceneIndex === DARK_FOREST_WATCHER_SCENE_INDEX) {
+    return createWatcherSceneLines();
+  }
 
-  return createWatcherSceneLines();
+  return createOldRootSceneLines();
 }
 
 function isDarkForestWatcherCell(x, y) {
-  if (getDarkForestSceneIndex() !== 0) {
+  if (getDarkForestSceneIndex() !== DARK_FOREST_WATCHER_SCENE_INDEX) {
     return false;
   }
 
@@ -318,11 +321,12 @@ export function renderDarkForestScreen() {
   setMainContentMode();
 
   renderTopBar();
-  const isWatcherScene = getDarkForestSceneIndex() === 0;
+  const isWatcherScene =
+    getDarkForestSceneIndex() === DARK_FOREST_WATCHER_SCENE_INDEX;
   const fightButton = isWatcherScene
     ? game.flags.defeatedDarkTreeWatcher
       ? "    The dark forest is quiet now."
-      : '    <span id="fightDarkForestWatcherButton" class="asciiRealButton hidden">Fight the darkTree watcher</span>'
+      : '    <span id="fightDarkForestWatcherButton" class="asciiRealButton hidden">Fight the fox</span>'
     : "";
 
   mainContent.innerHTML = `

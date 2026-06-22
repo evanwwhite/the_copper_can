@@ -7,6 +7,8 @@ import {
 import {
   tree1,
   tree2,
+  tree3,
+  tree4,
 } from "./nature.js";
 import {
   bench,
@@ -28,6 +30,8 @@ export const townScene = (() => {
   const lanternLines = getAsciiLines(lantern);
   const tree1Lines = getAsciiLines(tree1);
   const tree2Lines = getAsciiLines(tree2);
+  const tree3Lines = getAsciiLines(tree3);
+  const tree4Lines = getAsciiLines(tree4);
   const canvas = Array.from({ length: 40 }, () =>
     Array.from({ length: 112 }, () => " "),
   );
@@ -46,8 +50,10 @@ export const townScene = (() => {
   placeAsciiArt(canvas, benchLines, 60, 25);
   placeAsciiArt(canvas, lanternLines, 44, 25);
   placeAsciiArt(canvas, lanternLines, 55, 25);
-  placeAsciiArt(canvas, tree1Lines, 3, 28);
-  placeAsciiArt(canvas, tree2Lines, 103, 23);
+  placeAsciiArt(canvas, tree3Lines, 3, 28);
+  placeAsciiArt(canvas, tree3Lines, 55, 33);
+  placeAsciiArt(canvas, tree4Lines, 24, 33);
+  placeAsciiArt(canvas, tree4Lines, 84, 32);
 
   return canvas.map(row => row.join("")).join("\n");
 })();

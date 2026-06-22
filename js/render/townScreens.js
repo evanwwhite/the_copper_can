@@ -1,13 +1,43 @@
 import { game } from "../gameState.js";
-import { townScene, villagerSmall } from "../asciiArtHelper.js";
+import {
+  anvil,
+  balance,
+  banner,
+  barrel,
+  bed,
+  coalPile,
+  counter,
+  fireplace,
+  furnace,
+  hammer,
+  mug,
+  potions,
+  shelf,
+  table,
+  throne,
+  tongs,
+  townScene,
+  villagerSmall,
+  weaponRack,
+} from "../asciiArtHelper.js";
 import { makeBox } from "../helpers.js";
+import {
+  BOOTS_COST,
+  INN_REST_COST,
+  SLINGSHOT_COST,
+  SWORD_COST,
+} from "../data.js";
 import { saveGame } from "../saveSystem.js";
 import {
   acceptDarkForestChallenge,
+  buyBoots,
+  buySlingshot,
+  buySword,
   enterDarkForest,
   enterTownBuilding,
   leaveTownBuilding,
   receiveVillageMap,
+  restAtInn,
 } from "../actions.js";
 import { getAsciiLines, placeSprite } from "./ascii.js";
 import { escapeHtml, mainContent, setMainContentMode } from "./dom.js";
@@ -19,6 +49,19 @@ const TOWN_BUILDING_HOVER_REGIONS = [
   { id: "villageShop", label: "Village Shop", x: 34, y: 18, width: 14, height: 7, canEnter: true },
   { id: "blacksmith", label: "Blacksmith", x: 76, y: 20, width: 27, height: 12, canEnter: true },
 ];
+
+const LOCKABLE_BUILDING_IDS = ["riversideInn", "villageShop", "blacksmith"];
+
+const TOWN_LOCKED_MESSAGE =
+  "The doors are barred. While the fox prowls the far bank, the village " +
+  "has locked every shop and shuttered the inn. Drive the fox off and they " +
+  "will open again.";
+
+function isBuildingLocked(id) {
+  return (
+    LOCKABLE_BUILDING_IDS.includes(id) && !game.flags.defeatedDarkTreeWatcher
+  );
+}
 
 const DARK_FOREST_HOVER_REGION = {
   id: "darkForest",
@@ -32,14 +75,14 @@ const DARK_FOREST_HOVER_REGION = {
 
 const VILLAGE_HALL_CHALLENGE_DIALOGUE = [
   [
-    "At night, something comes down",
-    "from the dark trees across",
+    "At night, a terrifying creature comes",
+    "down from the dark trees across",
     "the river.",
   ],
   [
-    "It scrapes at shutters, steals",
-    "warmth from the hearths, and",
-    "leaves claw marks in the mud.",
+    "It scratches at shutters, steals",
+    "from the hearths, and leaves",
+    "claw marks in the mud.",
   ],
   [
     "Cross the river and face it.",
@@ -54,9 +97,8 @@ const VILLAGE_HALL_WAITING_DIALOGUE = [
     "the river.",
   ],
   [
-    "Return when the thing at the",
-    "old sign can trouble us no",
-    "longer.",
+    "Return when the creature can",
+    "trouble us no longer.",
   ],
 ];
 
@@ -102,11 +144,21 @@ function getVillageHallDialogue() {
 }
 
 function getActiveTownHoverRegions() {
+  const buildings = TOWN_BUILDING_HOVER_REGIONS.map(region => {
+    const locked = isBuildingLocked(region.id);
+
+    return {
+      ...region,
+      locked,
+      canEnter: region.canEnter && !locked,
+    };
+  });
+
   if (!game.flags.acceptedDarkForestChallenge) {
-    return TOWN_BUILDING_HOVER_REGIONS;
+    return buildings;
   }
 
-  return [...TOWN_BUILDING_HOVER_REGIONS, DARK_FOREST_HOVER_REGION];
+  return [...buildings, DARK_FOREST_HOVER_REGION];
 }
 
 function getTownBuildingRegion(x, y) {
@@ -202,7 +254,9 @@ function attachTownHoverListeners() {
       return;
     }
 
-    hoverLabel.textContent = region.label;
+    hoverLabel.textContent = region.locked
+      ? `${region.label} (locked)`
+      : region.label;
     positionTownHoverLabel(hoverLabel, townSceneElement, region);
     hoverLabel.classList.add("visible");
   });
@@ -224,7 +278,18 @@ function attachTownHoverListeners() {
       return item.id === target.dataset.townBuilding;
     });
 
-    if (!region?.canEnter) {
+    if (!region) {
+      return;
+    }
+
+    if (region.locked) {
+      game.lastMessage = TOWN_LOCKED_MESSAGE;
+      saveGame();
+      renderTownScreen();
+      return;
+    }
+
+    if (!region.canEnter) {
       return;
     }
 
@@ -237,7 +302,7 @@ function attachTownHoverListeners() {
   });
 }
 
-function createRoomCanvas(width = 74, height = 24) {
+function createRoomCanvas(width = 75, height = 24) {
   const canvas = Array.from({ length: height }, () =>
     Array.from({ length: width }, () => " "),
   );
@@ -279,6 +344,10 @@ function placeInteriorText(canvas, text, x, y) {
   placeInteriorLines(canvas, [text], x, y);
 }
 
+function placeFurniture(canvas, art, x, y) {
+  placeSprite(canvas, getAsciiLines(art), x, y);
+}
+
 function addRoomTitle(canvas, title) {
   placeInteriorText(canvas, `[ ${title} ]`, 3, 1);
 }
@@ -301,13 +370,40 @@ function buildVillageHallInteriorLines(dialogueStep = 0) {
 
   addRoomTitle(canvas, "Village Hall");
   addRoomFloor(canvas);
+  placeFurniture(canvas, banner, 19, 4);
+  placeFurniture(canvas, banner, 44, 4);
   placeInteriorLines(canvas, [
-    "     ___                 ___",
-    "    |   |               |   |",
-    "    |___|               |___|",
-  ], 8, 4);
-  placeInteriorLines(canvas, speechBox, 28, 7);
+    "     ______     ",
+    "  ,-'  ||  '-,  ",
+    " /     ||     \\",
+    "|=----=##=----=|",
+    "|      ||      |",
+    "|      ||      |",
+    "|=----=##=----=|",
+    "|      ||      |",
+    "|      ||      |",
+    "|=----=##=----=|",
+    "|______||______|",
+  ], 2, 2);
+  placeInteriorLines(canvas, [
+    "     ______     ",
+    "  ,-'  ||  '-,  ",
+    " /     ||     \\",
+    "|=----=##=----=|",
+    "|      ||      |",
+    "|      ||      |",
+    "|=----=##=----=|",
+    "|      ||      |",
+    "|      ||      |",
+    "|=----=##=----=|",
+    "|______||______|",
+  ], 57, 2);
+  placeFurniture(canvas, throne, 29, 11);
   placeSprite(canvas, getAsciiLines(villagerSmall), 18, 15);
+  // Anchor the speech box to the bottom of the room so it doesn't obstruct the
+  // throne/dais. Its bottom border sits one row above the room's bottom border.
+  const speechBoxTop = canvas.length - 1 - speechBox.length;
+  placeInteriorLines(canvas, speechBox, 28, speechBoxTop);
 
   return canvas.map(row => row.join("")).join("\n");
 }
@@ -317,17 +413,13 @@ function buildRiversideInnInteriorLines() {
 
   addRoomTitle(canvas, "Riverside Inn");
   addRoomFloor(canvas);
-  placeInteriorLines(canvas, [
-    "     _________                 _________",
-    "    | mug mug |               |  cot   |",
-    "    |_________|               |________|",
-  ], 9, 5);
-  placeInteriorLines(canvas, [
-    "              __________________",
-    "             |__|__|__|__|__|__|",
-    "             |   quiet counter  |",
-    "             |__________________|",
-  ], 20, 12);
+  placeFurniture(canvas, fireplace, 56, 12);
+  placeFurniture(canvas, barrel, 19, 13);
+  placeFurniture(canvas, table, 31, 16);
+  placeFurniture(canvas, mug, 36, 9);
+  placeFurniture(canvas, bed, 1, 11);
+  placeFurniture(canvas, bed, 1, 13);
+  
 
   return canvas.map(row => row.join("")).join("\n");
 }
@@ -337,18 +429,10 @@ function buildVillageShopInteriorLines() {
 
   addRoomTitle(canvas, "Village Shop");
   addRoomFloor(canvas);
-  placeInteriorLines(canvas, [
-    "       ______________________________",
-    "      |  twine  | lantern | crumbs  |",
-    "      |_________|_________|_________|",
-    "      |  maps   | magnets | jars    |",
-    "      |_________|_________|_________|",
-  ], 14, 6);
-  placeInteriorLines(canvas, [
-    "                 __________",
-    "                |  counter |",
-    "                |__________|",
-  ], 24, 16);
+  placeFurniture(canvas, shelf, 1, 9);
+  placeFurniture(canvas, balance, 19, 7);
+  //placeFurniture(canvas, counter, 27, 13);
+  placeFurniture(canvas, potions, 55, 9);
 
   return canvas.map(row => row.join("")).join("\n");
 }
@@ -358,19 +442,12 @@ function buildBlacksmithInteriorLines() {
 
   addRoomTitle(canvas, "Blacksmith");
   addRoomFloor(canvas);
-  placeInteriorLines(canvas, [
-    "       (  )                 ______",
-    "        )(                 / ____ \\",
-    "       _||_               /_/____\\_\\",
-    "      /____\\                |    |",
-    "      |    |                |____|",
-  ], 10, 5);
-  placeInteriorLines(canvas, [
-    "                         ______",
-    "              ______    / ____ \\",
-    "             /_____/|  /_/____\\_\\",
-    "             |_____|/    ANVIL",
-  ], 24, 14);
+  placeFurniture(canvas, tongs, 32, 4);
+  placeFurniture(canvas, hammer, 44, 4);
+  placeFurniture(canvas, furnace, 1, 1);
+  placeFurniture(canvas, coalPile, 17, 11);
+  placeFurniture(canvas, anvil, 36, 12);
+  placeFurniture(canvas, weaponRack, 52, 9);
 
   return canvas.map(row => row.join("")).join("\n");
 }
@@ -387,15 +464,62 @@ function getTownInteriorScene(buildingId, dialogueStep = 0) {
   return buildVillageHallInteriorLines(dialogueStep);
 }
 
+function makeBuyButton(id, label, cost, owned) {
+  if (owned) {
+    return `    <span class="asciiRealButton">${label} — Owned</span>`;
+  }
+
+  return `    <span id="${id}" class="asciiRealButton">${label} (${cost}c)</span>`;
+}
+
+function buildBuildingActionButtons(buildingId) {
+  if (buildingId === "villageShop") {
+    return [
+      makeBuyButton(
+        "buySlingshotButton",
+        "Buy Slingshot",
+        SLINGSHOT_COST,
+        game.inventory.slingshot,
+      ),
+      makeBuyButton(
+        "buyBootsButton",
+        "Buy Boots",
+        BOOTS_COST,
+        game.inventory.boots,
+      ),
+    ].join("\n\n");
+  }
+
+  if (buildingId === "blacksmith") {
+    return makeBuyButton(
+      "buySwordButton",
+      "Buy Sword",
+      SWORD_COST,
+      game.inventory.sword,
+    );
+  }
+
+  if (buildingId === "riversideInn") {
+    return `    <span id="restAtInnButton" class="asciiRealButton">Rest &amp; Recover (${INN_REST_COST}c)</span>`;
+  }
+
+  return "";
+}
+
 export function renderTownScreen() {
   game.world.screen = "town";
   saveGame();
   setMainContentMode();
 
+  const townMessage =
+    game.lastMessage !== ""
+      ? `\n\n${makeBox("MESSAGE", [game.lastMessage])}\n`
+      : "";
+
   renderTopBar();
   mainContent.innerHTML = `
 ${buildTownSceneMarkup()}
-`;
+${townMessage}`;
   attachTownHoverListeners();
   attachTopBarListeners();
 }
@@ -416,15 +540,27 @@ export function renderTownInteriorScreen(villageHallDialogueStep = 0) {
       : !game.flags.acceptedDarkForestChallenge
         ? '<span id="acceptDarkForestChallengeButton" class="asciiRealButton">Take up the Challenge</span>'
         : "";
-  const interiorButtons = isVillageHall
-    ? `${villageHallDialogueButton ? `    ${villageHallDialogueButton}\n\n\n` : ""}    <span id="leaveTownBuildingButton" class="asciiRealButton">Leave</span>`
-    : '    <span id="leaveTownBuildingButton" class="asciiRealButton">Leave</span>';
+  const leaveButton =
+    '    <span id="leaveTownBuildingButton" class="asciiRealButton">Leave</span>';
+  const buildingActionButtons = isVillageHall
+    ? villageHallDialogueButton
+      ? `    ${villageHallDialogueButton}`
+      : ""
+    : buildBuildingActionButtons(game.world.currentView);
+  const interiorButtons = buildingActionButtons
+    ? `${buildingActionButtons}\n\n\n${leaveButton}`
+    : leaveButton;
+
+  const interiorMessage =
+    !isVillageHall && game.lastMessage !== ""
+      ? `\n${makeBox("MESSAGE", [game.lastMessage])}\n\n`
+      : "";
 
   renderTopBar();
   mainContent.innerHTML = `
 ${getTownInteriorScene(game.world.currentView, villageHallDialogueStep)}
 
-
+${interiorMessage}
 ${interiorButtons}
 `;
 
@@ -453,6 +589,20 @@ ${interiorButtons}
   if (receiveVillageMapButton) {
     receiveVillageMapButton.addEventListener("click", receiveVillageMap);
   }
+
+  const buildingActionListeners = {
+    buySlingshotButton: buySlingshot,
+    buyBootsButton: buyBoots,
+    buySwordButton: buySword,
+    restAtInnButton: restAtInn,
+  };
+
+  Object.entries(buildingActionListeners).forEach(([id, handler]) => {
+    const button = document.getElementById(id);
+    if (button) {
+      button.addEventListener("click", handler);
+    }
+  });
 
   document
     .getElementById("leaveTownBuildingButton")
