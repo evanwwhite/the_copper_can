@@ -20,6 +20,7 @@ export {
 export {
   buildMapScreenModel,
   islandWorld,
+  miniMap1,
 } from "./asciiArt/map.js";
 export {
   buildThoughtsScreenArt,

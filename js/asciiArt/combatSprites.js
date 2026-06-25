@@ -1,6 +1,6 @@
 export const playerCombatArt = [
-  "  O  ",
-  " /|\\",
+  "  o  ",
+  " /│\\",
   " / \\",
 ];
 

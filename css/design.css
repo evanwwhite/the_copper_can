@@ -115,6 +115,14 @@ pre {
   color: #9a9a9a;
 }
 
+.mapBuildingHover {
+  cursor: pointer;
+}
+
+.mapBuildingHover:hover {
+  background-color: #eeebe7;
+}
+
 .worldMapScene {
   display: inline-block;
   white-space: pre;
