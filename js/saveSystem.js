@@ -94,6 +94,16 @@ export function hydrateGameState(saveData = {}) {
     hydratedState[key] = mergeDefined(defaults[key], migratedSaveData[key]);
   });
 
+  // Saves made before equippable gear existed have no *Equipped flags. Default
+  // each to whether the item is owned so existing gear keeps working in combat.
+  const rawInventory = migratedSaveData.inventory ?? {};
+  ["slingshot", "boots", "sword"].forEach((itemKey) => {
+    const equippedKey = `${itemKey}Equipped`;
+    if (rawInventory[equippedKey] === undefined) {
+      hydratedState.inventory[equippedKey] = hydratedState.inventory[itemKey];
+    }
+  });
+
   return hydratedState;
 }
 

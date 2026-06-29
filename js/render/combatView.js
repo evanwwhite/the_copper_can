@@ -10,7 +10,12 @@ import {
   playerCombatArt,
 } from "../asciiArtHelper.js";
 import { makePreformattedBox, wrapText } from "../helpers.js";
-import { exitCombat, returnToTownAfterDefeat } from "../actions.js";
+import {
+  exitCombat,
+  exitCombatDemo,
+  healPlayer,
+  returnToTownAfterDefeat,
+} from "../actions.js";
 import { getSpriteWidth, placeSprite } from "./ascii.js";
 import { escapeHtml, mainContent, setMainContentMode } from "./dom.js";
 
@@ -82,8 +87,21 @@ export function renderCombatView() {
 ${escapeHtml(makePreformattedBox("FIGHT", combatLines, COMBAT_ARENA_WIDTH))}
 `;
 
+  if (game.combat.demo) {
+    content += `
+
+    <span id="healButton" class="asciiRealButton">Heal to full</span>
+
+`;
+  }
+
   if (game.combat.canExit) {
-    const exitLabel = game.combat.defeated ? "Return to town" : "Exit fight";
+    let exitLabel = game.combat.defeated ? "Return to town" : "Exit fight";
+
+    if (game.combat.demo) {
+      exitLabel = game.combat.defeated ? "Back to demo" : "Fight again";
+    }
+
     content += `
 
     <span id="exitCombatButton" class="asciiRealButton">${exitLabel}</span>
@@ -93,11 +111,19 @@ ${escapeHtml(makePreformattedBox("FIGHT", combatLines, COMBAT_ARENA_WIDTH))}
 
   mainContent.innerHTML = content;
 
+  const healButton = document.getElementById("healButton");
+  if (healButton) {
+    healButton.addEventListener("click", healPlayer);
+  }
+
   const exitCombatButton = document.getElementById("exitCombatButton");
   if (exitCombatButton) {
-    exitCombatButton.addEventListener(
-      "click",
-      game.combat.defeated ? returnToTownAfterDefeat : exitCombat,
-    );
+    let exitHandler = game.combat.defeated ? returnToTownAfterDefeat : exitCombat;
+
+    if (game.combat.demo) {
+      exitHandler = exitCombatDemo;
+    }
+
+    exitCombatButton.addEventListener("click", exitHandler);
   }
 }

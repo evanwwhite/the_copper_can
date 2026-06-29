@@ -6,16 +6,18 @@ export const SLINGSHOT_COST = 15;
 export const BOOTS_COST = 12;
 export const SWORD_COST = 20;
 export const INN_REST_COST = 5;
-export const SWORD_ATTACK_BONUS = 2;
+export const SWORD_ATTACK_BONUS = 1;
 export const BOOTS_DAMAGE_REDUCTION = 1;
-export const SLINGSHOT_APPROACH_DAMAGE = 1;
+export const SLINGSHOT_APPROACH_DAMAGE = .5;
+export const SLINGSHOT_TICK_INTERVAL = 7;
+export const SWORD_TICK_INTERVAL = 5;
 export const SAVE_KEY = "theCopperCanPrototypeSave";
 export const LEGACY_SAVE_KEYS = ["bitsBoxPrototypeSave"];
 export const COMBAT_ARENA_WIDTH = 98;
 export const COMBAT_ARENA_HEIGHT = 16;
-export const COMBAT_TICK_MS = 180;
-export const COMBAT_MOVE_STEP = 2;
-export const COMBAT_PLAYER_DAMAGE = 2;
+export const COMBAT_TICK_MS = 80;
+export const COMBAT_MOVE_STEP = 1;
+export const COMBAT_PLAYER_DAMAGE = 1;
 
 export const thoughts = [
   {

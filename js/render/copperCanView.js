@@ -12,9 +12,11 @@ import {
   buyFreeWill,
   disturbBeehive,
   gatherCopperBit,
+  healPlayer,
   ignoreCopperCan,
   investigateMagnet,
   refuseCopperCan,
+  startCombatDemo,
   throwBitsOnGround,
   unlockMap,
 } from "../actions.js";
@@ -44,6 +46,16 @@ ${makeBox("Copper Can", canLines)}
 
 
     <span id="gatherBitButton" class="asciiRealButton">Pick up a copper bit</span>
+
+${makeBox("COMBAT BETA", [
+  "A practice arena for testing fights.",
+  "",
+  `Health: ${game.player.health}/${game.player.maxHealth}`,
+])}
+
+    <span id="combatDemoButton" class="asciiRealButton">Enter combat demo</span>
+
+    <span id="canHealButton" class="asciiRealButton">Heal to full</span>
 
 `;
 
@@ -175,6 +187,16 @@ ${makeBox("MESSAGE", [game.lastMessage])}
   const gatherBitButton = document.getElementById("gatherBitButton");
   if (gatherBitButton) {
     gatherBitButton.addEventListener("click", gatherCopperBit);
+  }
+
+  const combatDemoButton = document.getElementById("combatDemoButton");
+  if (combatDemoButton) {
+    combatDemoButton.addEventListener("click", startCombatDemo);
+  }
+
+  const canHealButton = document.getElementById("canHealButton");
+  if (canHealButton) {
+    canHealButton.addEventListener("click", healPlayer);
   }
 
   const refuseCopperCanButton = document.getElementById(

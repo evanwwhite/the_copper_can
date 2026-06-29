@@ -19,6 +19,7 @@ export {
 } from "./asciiArt/combatSprites.js";
 export {
   buildMapScreenModel,
+  islandOcean,
   islandWorld,
   miniMap1,
 } from "./asciiArt/map.js";

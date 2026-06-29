@@ -2,6 +2,7 @@ import { game } from "../gameState.js";
 import {
   forest,
   forestTrailSignScene,
+  islandOcean,
   islandWorld,
   miniMap1,
 } from "../asciiArtHelper.js";
@@ -73,6 +74,54 @@ const MAP_BUILDING_HOVER_REGIONS = [
   },
 ];
 
+// Hover regions drawn into the islandWorld art. The village sits along the
+// island's left shore; hovering it surfaces the "Village Minimap" label and
+// clicking it drops the player into the detailed minimap (miniMap1). Rows map
+// to islandWorld.split("\n"); y 26-37 == map.js lines 116-127.
+const ISLAND_HOVER_REGIONS = [
+  {
+    id: "villageMinimap",
+    label: "Village Minimap",
+    action: () => switchView("map"),
+    parts: [{ x: 8, y: 26, width: 25, height: 12 }],
+  },
+];
+
+// Composite `foreground` onto `background`, anchored at (offsetX, offsetY).
+// Foreground spaces are treated as transparent so the background art (the
+// ocean) shows through the gaps in the island silhouette.
+function overlayArt(background, foreground, offsetX, offsetY) {
+  const result = background.split("\n").map(line => [...line]);
+
+  foreground.split("\n").forEach((fgLine, fgRow) => {
+    const row = fgRow + offsetY;
+    if (row < 0 || row >= result.length) {
+      return;
+    }
+
+    [...fgLine].forEach((character, fgCol) => {
+      if (character === " ") {
+        return;
+      }
+      const col = fgCol + offsetX;
+      if (col >= 0 && col < result[row].length) {
+        result[row][col] = character;
+      }
+    });
+  });
+
+  return result.map(chars => chars.join("")).join("\n");
+}
+
+// Shift every hover region horizontally so its coordinates line up with art
+// that has been overlaid at a column offset.
+function offsetRegions(regions, offsetX) {
+  return regions.map(region => ({
+    ...region,
+    parts: region.parts.map(part => ({ ...part, x: part.x + offsetX })),
+  }));
+}
+
 function isInPart(part, x, y) {
   return (
     x >= part.x &&
@@ -82,8 +131,8 @@ function isInPart(part, x, y) {
   );
 }
 
-function getMapBuildingRegion(x, y) {
-  return MAP_BUILDING_HOVER_REGIONS.find(region => {
+function getRegionAt(regions, x, y) {
+  return regions.find(region => {
     return region.parts.some(part => isInPart(part, x, y));
   });
 }
@@ -96,23 +145,26 @@ function getRegionBounds(region) {
   return { centerColumn: (minX + maxX) / 2, bottomRow: maxBottom };
 }
 
-function buildMiniMapMarkup() {
-  const lines = miniMap1.split("\n");
+// Wrap each character that falls inside a hover region in a span so the art can
+// stay a single block of monospaced text while individual buildings/areas stay
+// hoverable and clickable.
+function buildHoverScene(art, regions, sceneId, sceneClass) {
+  const lines = art.split("\n");
 
   const sceneMarkup = lines.map((line, y) => {
     return [...line].map((character, x) => {
       const visibleCharacter = escapeHtml(character);
-      const region = getMapBuildingRegion(x, y);
+      const region = getRegionAt(regions, x, y);
 
       if (!region) {
         return visibleCharacter;
       }
 
-      return `<span class="mapBuildingHover" data-map-building="${escapeHtml(region.id)}">${visibleCharacter}</span>`;
+      return `<span class="mapBuildingHover" data-hover-region="${escapeHtml(region.id)}">${visibleCharacter}</span>`;
     }).join("");
   }).join("\n");
 
-  return `<span id="mapScene" class="mapScene">${sceneMarkup}</span><span id="mapHoverLabel" class="townHoverLabel"></span>`;
+  return `<span id="${sceneId}" class="${sceneClass}">${sceneMarkup}</span><span id="${sceneId}Label" class="townHoverLabel"></span>`;
 }
 
 function hideMapHoverLabel(hoverLabel) {
@@ -120,11 +172,11 @@ function hideMapHoverLabel(hoverLabel) {
   hoverLabel.textContent = "";
 }
 
-function getMapSceneMetrics(mapSceneElement) {
-  const bounds = mapSceneElement.getBoundingClientRect();
-  const lines = miniMap1.split("\n");
+function getSceneMetrics(sceneElement, art) {
+  const bounds = sceneElement.getBoundingClientRect();
+  const lines = art.split("\n");
   const widestLineWidth = Math.max(...lines.map(line => [...line].length), 1);
-  const style = window.getComputedStyle(mapSceneElement);
+  const style = window.getComputedStyle(sceneElement);
   const fontSize = Number.parseFloat(style.fontSize) || 16;
   const lineHeight = Number.parseFloat(style.lineHeight) || fontSize * 1.2;
 
@@ -136,34 +188,32 @@ function getMapSceneMetrics(mapSceneElement) {
   };
 }
 
-function positionMapHoverLabel(hoverLabel, mapSceneElement, region) {
-  const metrics = getMapSceneMetrics(mapSceneElement);
+function positionHoverLabel(hoverLabel, sceneElement, region, art) {
+  const metrics = getSceneMetrics(sceneElement, art);
   const { centerColumn, bottomRow } = getRegionBounds(region);
 
   hoverLabel.style.left = `${metrics.left + centerColumn * metrics.charWidth}px`;
   hoverLabel.style.top = `${metrics.top + bottomRow * metrics.lineHeight + 4}px`;
 }
 
-function attachMapHoverListeners() {
-  const mapSceneElement = document.getElementById("mapScene");
-  const hoverLabel = document.getElementById("mapHoverLabel");
+function attachSceneHoverListeners(sceneId, regions, art) {
+  const sceneElement = document.getElementById(sceneId);
+  const hoverLabel = document.getElementById(`${sceneId}Label`);
 
-  if (!mapSceneElement || !hoverLabel) {
+  if (!sceneElement || !hoverLabel) {
     return;
   }
 
   const regionForTarget = target => {
-    return MAP_BUILDING_HOVER_REGIONS.find(item => {
-      return item.id === target.dataset.mapBuilding;
-    });
+    return regions.find(item => item.id === target.dataset.hoverRegion);
   };
 
-  mapSceneElement.addEventListener("mousemove", event => {
+  sceneElement.addEventListener("mousemove", event => {
     const target = event.target instanceof Element
       ? event.target.closest(".mapBuildingHover")
       : null;
 
-    if (!target || !mapSceneElement.contains(target)) {
+    if (!target || !sceneElement.contains(target)) {
       hideMapHoverLabel(hoverLabel);
       return;
     }
@@ -176,20 +226,20 @@ function attachMapHoverListeners() {
     }
 
     hoverLabel.textContent = region.label;
-    positionMapHoverLabel(hoverLabel, mapSceneElement, region);
+    positionHoverLabel(hoverLabel, sceneElement, region, art);
     hoverLabel.classList.add("visible");
   });
 
-  mapSceneElement.addEventListener("mouseleave", () => {
+  sceneElement.addEventListener("mouseleave", () => {
     hideMapHoverLabel(hoverLabel);
   });
 
-  mapSceneElement.addEventListener("click", event => {
+  sceneElement.addEventListener("click", event => {
     const target = event.target instanceof Element
       ? event.target.closest(".mapBuildingHover")
       : null;
 
-    if (!target || !mapSceneElement.contains(target)) {
+    if (!target || !sceneElement.contains(target)) {
       return;
     }
 
@@ -205,26 +255,29 @@ export function renderMapView() {
   setMainContentMode();
 
   mainContent.innerHTML = `
-${buildMiniMapMarkup()}
+${buildHoverScene(miniMap1, MAP_BUILDING_HOVER_REGIONS, "mapScene", "mapScene")}
 `;
 
-  attachMapHoverListeners();
+  attachSceneHoverListeners("mapScene", MAP_BUILDING_HOVER_REGIONS, miniMap1);
 }
 
 export function renderWorldMapView() {
   setMainContentMode();
 
+  // Center the island silhouette inside the wider ocean field, then draw the
+  // ocean behind it so the world map sits in the middle of open water.
+  const oceanWidth = Math.max(...islandOcean.split("\n").map(line => [...line].length));
+  const islandWidth = Math.max(...islandWorld.split("\n").map(line => [...line].length));
+  const offsetX = Math.max(0, Math.floor((oceanWidth - islandWidth) / 2));
+
+  const scene = overlayArt(islandOcean, islandWorld, offsetX, 0);
+  const regions = offsetRegions(ISLAND_HOVER_REGIONS, offsetX);
+
   mainContent.innerHTML = `
-<span class="worldMapScene">${escapeHtml(islandWorld)}</span>
-
-
-    <span id="leaveWorldMapButton" class="asciiRealButton">Back to the map</span>
+${buildHoverScene(scene, regions, "islandScene", "worldMapScene")}
 `;
 
-  const leaveWorldMapButton = document.getElementById("leaveWorldMapButton");
-  if (leaveWorldMapButton) {
-    leaveWorldMapButton.addEventListener("click", () => switchView("map"));
-  }
+  attachSceneHoverListeners("islandScene", regions, scene);
 }
 
 export function renderForestPathScreen() {

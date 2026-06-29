@@ -11,7 +11,12 @@ import {
 } from "../asciiArtHelper.js";
 import { thoughts } from "../data.js";
 import { makeBox } from "../helpers.js";
-import { manualSave, resetPrototype, switchView } from "../actions.js";
+import {
+  manualSave,
+  resetPrototype,
+  switchView,
+  toggleEquip,
+} from "../actions.js";
 import { overlayAsciiArt, toArtLines } from "./ascii.js";
 import { escapeHtml, mainContent, setMainContentMode } from "./dom.js";
 
@@ -56,6 +61,9 @@ function centerInCell(art, columnIndex) {
   return { art, x, y };
 }
 
+// Items that can be equipped for combat, keyed by their grid column index.
+const EQUIPPABLE_BY_INDEX = { 3: "slingshot", 4: "boots", 5: "sword" };
+
 function buildPackInventoryArt() {
   const items = [
     { has: game.inventory.copperCan, art: copperCanAsset },
@@ -66,24 +74,84 @@ function buildPackInventoryArt() {
     { has: game.inventory.sword, art: swordAsset },
   ];
 
-  const overlays = items
-    .map((item, index) => (item.has ? centerInCell(item.art, index) : null))
-    .filter(Boolean);
+  const overlays = [];
+
+  items.forEach((item, index) => {
+    if (!item.has) return;
+
+    overlays.push(centerInCell(item.art, index));
+
+    // Mark equipped gear with a star on its cell's top border so the item
+    // itself visibly changes when equipped.
+    const equipKey = EQUIPPABLE_BY_INDEX[index];
+    if (equipKey && game.inventory[`${equipKey}Equipped`]) {
+      overlays.push({
+        art: "*",
+        x: PACK_GRID.columnStarts[index] + Math.floor(PACK_GRID.cellWidth / 2),
+        y: PACK_GRID.cellTop - 1,
+      });
+    }
+  });
 
   return overlayAsciiArt(inventoryScreenMassive, overlays);
+}
+
+function buildGearControls() {
+  const gear = [
+    { key: "slingshot", label: "Slingshot" },
+    { key: "boots", label: "Boots" },
+    { key: "sword", label: "Sword" },
+  ].filter((item) => game.inventory[item.key]);
+
+  if (gear.length === 0) {
+    return escapeHtml(
+      makeBox("GEAR", [
+        "You have no equippable gear yet.",
+        "Buy a slingshot, boots, or a sword in the village.",
+      ]),
+    );
+  }
+
+  const box = escapeHtml(
+    makeBox("GEAR", [
+      "A * marks equipped gear above.",
+      "Only equipped gear affects combat.",
+    ]),
+  );
+
+  const buttons = gear
+    .map((item) => {
+      const equipped = game.inventory[`${item.key}Equipped`];
+      const state = equipped ? "[EQUIPPED]" : "[ unequipped ]";
+      const action = equipped ? "Unequip" : "Equip";
+      return `    <span class="asciiRealButton equipButton" data-item="${item.key}">${action} ${item.label}  ${state}</span>`;
+    })
+    .join("\n\n");
+
+  return `${box}\n\n${buttons}`;
 }
 
 export function renderPackView() {
   setMainContentMode();
   const inventoryArt = buildPackInventoryArt();
+  const gearControls = buildGearControls();
 
   mainContent.innerHTML = `
 ${escapeHtml(inventoryArt)}
 
 
+${gearControls}
+
+
     <span id="returnToCanButton" class="asciiRealButton">Return to the copper can</span>
 
 `;
+
+  document.querySelectorAll(".equipButton").forEach((button) => {
+    button.addEventListener("click", () => {
+      toggleEquip(button.dataset.item);
+    });
+  });
 
   document.getElementById("returnToCanButton").addEventListener("click", () => {
     switchView("can");

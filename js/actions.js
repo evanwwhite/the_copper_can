@@ -12,8 +12,10 @@ import {
   INN_REST_COST,
   SLINGSHOT_APPROACH_DAMAGE,
   SLINGSHOT_COST,
+  SLINGSHOT_TICK_INTERVAL,
   SWORD_ATTACK_BONUS,
   SWORD_COST,
+  SWORD_TICK_INTERVAL,
   combatEnemies,
 } from "./data.js";
 import { saveGame, clearSave, hydrateGameState } from "./saveSystem.js";
@@ -82,11 +84,16 @@ function getCombatEnemy() {
 }
 
 export function getPlayerCombatStats() {
+  const swordBonus = game.inventory.swordEquipped ? SWORD_ATTACK_BONUS : 0;
+
   return {
-    attackDamage:
-      COMBAT_PLAYER_DAMAGE + (game.inventory.sword ? SWORD_ATTACK_BONUS : 0),
-    damageReduction: game.inventory.boots ? BOOTS_DAMAGE_REDUCTION : 0,
-    approachDamage: game.inventory.slingshot ? SLINGSHOT_APPROACH_DAMAGE : 0,
+    baseAttackDamage: COMBAT_PLAYER_DAMAGE,
+    swordBonus,
+    attackDamage: COMBAT_PLAYER_DAMAGE + swordBonus,
+    damageReduction: game.inventory.bootsEquipped ? BOOTS_DAMAGE_REDUCTION : 0,
+    approachDamage: game.inventory.slingshotEquipped
+      ? SLINGSHOT_APPROACH_DAMAGE
+      : 0,
   };
 }
 
@@ -184,7 +191,7 @@ function resolveCombatVictory(enemy) {
   game.combat.phase = "victory";
   game.combat.canExit = true;
   game.combat.rewardCopperBits = enemy.rewardCopperBits;
-  if (enemy.id === "darkTreeWatcher") {
+  if (enemy.id === "darkTreeWatcher" && !game.combat.demo) {
     game.flags.defeatedDarkTreeWatcher = true;
   }
   game.currencies.copper += enemy.rewardCopperBits;
@@ -217,8 +224,16 @@ async function resolveCombatTick() {
 
   if (game.combat.phase === "approach") {
     game.combat.message = enemy.approachText;
+    game.combat.approachTicks += 1;
 
-    if (stats.approachDamage > 0) {
+    // The slingshot only weakens the enemy on the approach, and only lands a
+    // shot every third tick so it stays a chip-damage tool rather than a
+    // primary weapon.
+    const slingshotFires =
+      stats.approachDamage > 0 &&
+      game.combat.approachTicks % SLINGSHOT_TICK_INTERVAL === 0;
+
+    if (slingshotFires) {
       game.combat.enemyHp = Math.max(
         0,
         game.combat.enemyHp - stats.approachDamage,
@@ -240,10 +255,16 @@ async function resolveCombatTick() {
       game.combat.message = enemy.attackText;
     }
   } else if (game.combat.phase === "attack") {
-    game.combat.enemyHp = Math.max(
-      0,
-      game.combat.enemyHp - stats.attackDamage,
-    );
+    game.combat.attackTicks += 1;
+
+    // The sword's bonus only bites every other swing, so the base strike lands
+    // each tick and the extra sword damage lands every SWORD_TICK_INTERVAL ticks.
+    const swordSwings =
+      stats.swordBonus > 0 &&
+      game.combat.attackTicks % SWORD_TICK_INTERVAL === 0;
+    const attackDamage = stats.baseAttackDamage + (swordSwings ? stats.swordBonus : 0);
+
+    game.combat.enemyHp = Math.max(0, game.combat.enemyHp - attackDamage);
 
     if (game.combat.enemyHp === 0) {
       resolveCombatVictory(enemy);
@@ -530,6 +551,7 @@ async function buyGear(itemKey, cost, successMessage, { render = true } = {}) {
   } else {
     game.currencies.copper -= cost;
     game.inventory[itemKey] = true;
+    game.inventory[`${itemKey}Equipped`] = true;
     game.lastMessage = successMessage;
     purchased = true;
   }
@@ -692,6 +714,77 @@ export async function startDarkTreeFight() {
 
   saveGame();
   startCombatLoop();
+  await renderGame();
+}
+
+export async function startCombatDemo() {
+  if (game.combat.active) return;
+
+  const enemy = combatEnemies.darkTreeWatcher;
+
+  game.world.screen = "game";
+  game.world.currentView = "combat";
+  game.combat = {
+    ...createCombatState(),
+    active: true,
+    phase: "approach",
+    enemyId: enemy.id,
+    enemyHp: enemy.maxHealth,
+    enemyMaxHp: enemy.maxHealth,
+    playerX: 2,
+    enemyX: COMBAT_ARENA_WIDTH - 12,
+    returnScreen: "game",
+    returnView: "can",
+    demo: true,
+    message: enemy.introText,
+  };
+
+  saveGame();
+  startCombatLoop();
+  await renderGame();
+}
+
+export async function exitCombatDemo() {
+  if (!game.combat.canExit) return;
+
+  resetCombatState();
+  game.world.screen = "game";
+  game.world.currentView = "can";
+  game.lastMessage = "Demo round complete. Fight again whenever you like.";
+
+  saveGame();
+  await renderGame();
+}
+
+const EQUIPPABLE_ITEMS = {
+  slingshot: "slingshot",
+  boots: "boots",
+  sword: "sword",
+};
+
+export async function toggleEquip(itemKey) {
+  if (!EQUIPPABLE_ITEMS[itemKey]) return;
+  if (!game.inventory[itemKey]) return;
+
+  const equippedKey = `${itemKey}Equipped`;
+  const nowEquipped = !game.inventory[equippedKey];
+  game.inventory[equippedKey] = nowEquipped;
+
+  const label = itemKey.charAt(0).toUpperCase() + itemKey.slice(1);
+  game.lastMessage = nowEquipped
+    ? `${label} equipped.`
+    : `${label} unequipped.`;
+
+  saveGame();
+  await renderGame();
+}
+
+export async function healPlayer() {
+  game.player.health = game.player.maxHealth;
+  game.lastMessage = `Healed to full (${game.player.maxHealth}/${game.player.maxHealth}).`;
+  game.combat.message = `You are patched up to ${game.player.health}/${game.player.maxHealth}.`;
+
+  saveGame();
   await renderGame();
 }
 

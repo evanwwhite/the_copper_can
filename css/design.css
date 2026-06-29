@@ -129,7 +129,7 @@ pre {
   font-size: 1em;
   /* Tight leading so the one-stroke-per-row coastline reads as a continuous
      line rather than dotted dashes. Tune together with the island art. */
-  line-height: 1.2;
+  line-height: 1.1;
   letter-spacing: .1;
   text-align: center;
 }
