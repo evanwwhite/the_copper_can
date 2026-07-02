@@ -1,14 +1,13 @@
 export function createCombatState() {
   return {
     active: false,
-    phase: "idle",
+    phase: "idle", // idle | fight | victory | defeat
     enemyId: null,
     enemyHp: 0,
     enemyMaxHp: 0,
-    approachTicks: 0,
-    attackTicks: 0,
     playerX: 2,
     enemyX: 58,
+    enemyHomeX: 58,
     canExit: false,
     defeated: false,
     demo: false,
@@ -16,6 +15,28 @@ export function createCombatState() {
     returnView: "map",
     message: "",
     rewardCopperBits: 0,
+
+    // Player-driven input state (the tick reads these; keys/buttons write them)
+    equippedWeapon: "slingshot",
+    targetZone: 5, // numpad-spatial 1-9; center is always x1.0
+    bracing: false,
+    releasedBrace: false, // set on the keyup that ends a brace; consumed by the tick
+
+    guard: 100,
+    slingshotAmmo: 5,
+    ammoRegenCounter: 0,
+
+    cooldowns: { slingshot: 0, spear: 0, sword: 0 },
+    enemyAttackTimer: 0,
+    enemyTelegraph: 0,
+    enemyStagger: 0,
+    enemyLungeDelay: 0,
+    weakRevealed: false,
+
+    ticks: 0,
+    log: [], // [{ text, kind }] append-only history
+    fightBits: 0,
+    hitFlash: null, // { text, over: "enemy"|"player", ticks } floating damage
   };
 }
 
@@ -50,6 +71,8 @@ export function createInitialGameState() {
       slingshot: false,
       boots: false,
       sword: false,
+      spear: false,
+      shield: false,
       slingshotEquipped: false,
       bootsEquipped: false,
       swordEquipped: false,

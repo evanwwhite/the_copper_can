@@ -61,3 +61,9 @@ export const swordAsset = String.raw`
 │
 ┼
 `;
+
+export const spearAsset = String.raw`
+  /
+ /
+/
+`;

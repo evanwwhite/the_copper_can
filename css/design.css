@@ -95,6 +95,119 @@ pre {
   background-color: #eeebe7;
 }
 
+/* --- Combat screen: arena / status strip / scrolling log / controls --- */
+
+#combatShell pre {
+  margin: 0 0 4px 0;
+}
+
+.combatLog {
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 1em;
+  line-height: 1.2;
+  text-align: left;
+  border: 1px solid #464c54;
+  max-height: 9.6em; /* ~8 visible rows */
+  overflow-y: auto;
+  padding: 4px 8px;
+  margin-bottom: 6px;
+  background-color: #fbfaf8;
+}
+
+.combatLogLine {
+  white-space: pre-wrap;
+}
+
+.combatLog-crit,
+.combatLog-reward {
+  font-weight: bold;
+  color: #7a4a00;
+}
+
+.combatLog-hurt {
+  color: #8a1f1f;
+}
+
+.combatLog-guard {
+  color: #1f4f8a;
+}
+
+.combatLog-result {
+  font-weight: bold;
+}
+
+#combatControls {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+  font-family: Consolas, "Courier New", monospace;
+}
+
+.combatControlGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-start;
+}
+
+.combatControlLabel {
+  font-size: 11px;
+  color: #666666;
+}
+
+.combatWeaponButton.combatEquipped,
+#combatBraceButton.combatEquipped {
+  background-color: #c9b98a;
+  border-color: #111111;
+}
+
+.combatWeaponButton.combatDimmed {
+  opacity: 0.45;
+}
+
+.combatWeaponButton.combatUnowned {
+  opacity: 0.25;
+  text-decoration: line-through;
+}
+
+.combatZoneGrid {
+  display: inline-block;
+  border: 1px solid #464c54;
+  padding: 2px;
+}
+
+.combatZoneRow {
+  display: flex;
+}
+
+.combatZoneButton {
+  cursor: pointer;
+  user-select: none;
+  width: 1.6em;
+  text-align: center;
+  border: 1px solid #b0aca4;
+  background-color: #dcdad5;
+  margin: 1px;
+}
+
+.combatZoneButton:hover {
+  background-color: #eeebe7;
+}
+
+.combatZoneButton.combatZoneSelected {
+  background-color: #c9b98a;
+  border-color: #111111;
+}
+
+.combatZoneButton.combatZoneWeak {
+  background-color: #f0d060;
+  font-weight: bold;
+}
+
+#combatEnd {
+  margin-top: 8px;
+}
+
 .townBuildingEnterable {
   cursor: pointer;
 }
@@ -130,8 +243,11 @@ pre {
   /* Tight leading so the one-stroke-per-row coastline reads as a continuous
      line rather than dotted dashes. Tune together with the island art. */
   line-height: 1.1;
-  letter-spacing: .1;
-  text-align: center;
+  /* Left-align so every row shares column 0. The overlay places each glyph at
+     an absolute column, so centering here would shift shorter rows inward by
+     half their shortfall and break vertical alignment. The block itself is
+     centered on the page by #mainContent (margin: 0 auto under body). */
+  text-align: left;
 }
 
 .darkTreeWatcherSprite {

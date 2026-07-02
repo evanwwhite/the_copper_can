@@ -7,6 +7,7 @@ import {
   inventoryScreenMassive,
   mapAsset,
   slingshotAsset,
+  spearAsset,
   swordAsset,
 } from "../asciiArtHelper.js";
 import { thoughts } from "../data.js";
@@ -26,6 +27,7 @@ const PACK_GRID = {
   cellTop: 4,
   cellHeight: 3,
   cellWidth: 9,
+  rowStride: 4, // interior height + shared border line
   columnStarts: [3, 13, 23, 33, 43, 53],
 };
 
@@ -33,11 +35,12 @@ const PACK_GRID = {
 // column index. Array assets are hand-positioned: they're anchored at the
 // cell's top-left so the author's literal spacing controls the offset. String
 // assets are auto-centered by their content bounding box.
-function centerInCell(art, columnIndex) {
+function centerInCell(art, columnIndex, rowIndex = 0) {
   const cellStart = PACK_GRID.columnStarts[columnIndex];
+  const cellTop = PACK_GRID.cellTop + rowIndex * PACK_GRID.rowStride;
 
   if (Array.isArray(art)) {
-    return { art, x: cellStart, y: PACK_GRID.cellTop };
+    return { art, x: cellStart, y: cellTop };
   }
 
   const lines = toArtLines(art);
@@ -55,40 +58,36 @@ function centerInCell(art, columnIndex) {
   const contentWidth = maxCol - minCol + 1;
   const x =
     cellStart + Math.floor((PACK_GRID.cellWidth - contentWidth) / 2) - minCol;
-  const y =
-    PACK_GRID.cellTop + Math.floor((PACK_GRID.cellHeight - lines.length) / 2);
+  const y = cellTop + Math.floor((PACK_GRID.cellHeight - lines.length) / 2);
 
   return { art, x, y };
 }
 
-// Items that can be equipped for combat, keyed by their grid column index.
-const EQUIPPABLE_BY_INDEX = { 3: "slingshot", 4: "boots", 5: "sword" };
-
 function buildPackInventoryArt() {
   const items = [
-    { has: game.inventory.copperCan, art: copperCanAsset },
-    { has: game.inventory.bentMagnet, art: bentMagnetAsset },
-    { has: game.inventory.map, art: mapAsset },
-    { has: game.inventory.slingshot, art: slingshotAsset },
-    { has: game.inventory.boots, art: bootsAsset },
-    { has: game.inventory.sword, art: swordAsset },
+    { has: game.inventory.copperCan, art: copperCanAsset, col: 0, row: 0 },
+    { has: game.inventory.bentMagnet, art: bentMagnetAsset, col: 1, row: 0 },
+    { has: game.inventory.map, art: mapAsset, col: 2, row: 0 },
+    { has: game.inventory.slingshot, art: slingshotAsset, col: 3, row: 0, equip: "slingshot" },
+    { has: game.inventory.boots, art: bootsAsset, col: 4, row: 0, equip: "boots" },
+    { has: game.inventory.sword, art: swordAsset, col: 5, row: 0, equip: "sword" },
+    { has: game.inventory.spear, art: spearAsset, col: 0, row: 1, equip: "spear" },
   ];
 
   const overlays = [];
 
-  items.forEach((item, index) => {
+  items.forEach((item) => {
     if (!item.has) return;
 
-    overlays.push(centerInCell(item.art, index));
+    overlays.push(centerInCell(item.art, item.col, item.row));
 
     // Mark equipped gear with a star on its cell's top border so the item
     // itself visibly changes when equipped.
-    const equipKey = EQUIPPABLE_BY_INDEX[index];
-    if (equipKey && game.inventory[`${equipKey}Equipped`]) {
+    if (item.equip && game.inventory[`${item.equip}Equipped`]) {
       overlays.push({
         art: "*",
-        x: PACK_GRID.columnStarts[index] + Math.floor(PACK_GRID.cellWidth / 2),
-        y: PACK_GRID.cellTop - 1,
+        x: PACK_GRID.columnStarts[item.col] + Math.floor(PACK_GRID.cellWidth / 2),
+        y: PACK_GRID.cellTop + item.row * PACK_GRID.rowStride - 1,
       });
     }
   });
@@ -101,6 +100,7 @@ function buildGearControls() {
     { key: "slingshot", label: "Slingshot" },
     { key: "boots", label: "Boots" },
     { key: "sword", label: "Sword" },
+    { key: "spear", label: "Spear" },
   ].filter((item) => game.inventory[item.key]);
 
   if (gear.length === 0) {

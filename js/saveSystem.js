@@ -90,6 +90,21 @@ export function hydrateGameState(saveData = {}) {
     combat: mergeDefined(createCombatState(), migratedSaveData.combat),
   };
 
+  // Saves from the brief pry-bar era: map the renamed weapon onto the spear.
+  if (!["slingshot", "spear", "sword"].includes(hydratedState.combat.equippedWeapon)) {
+    hydratedState.combat.equippedWeapon = "spear";
+  }
+  hydratedState.combat.cooldowns = {
+    slingshot: 0,
+    spear: 0,
+    sword: 0,
+    ...Object.fromEntries(
+      Object.entries(hydratedState.combat.cooldowns ?? {}).filter(
+        ([key]) => ["slingshot", "spear", "sword"].includes(key),
+      ),
+    ),
+  };
+
   SAVE_GROUP_KEYS.forEach((key) => {
     hydratedState[key] = mergeDefined(defaults[key], migratedSaveData[key]);
   });
@@ -97,7 +112,7 @@ export function hydrateGameState(saveData = {}) {
   // Saves made before equippable gear existed have no *Equipped flags. Default
   // each to whether the item is owned so existing gear keeps working in combat.
   const rawInventory = migratedSaveData.inventory ?? {};
-  ["slingshot", "boots", "sword"].forEach((itemKey) => {
+  ["slingshot", "boots", "sword", "spear"].forEach((itemKey) => {
     const equippedKey = `${itemKey}Equipped`;
     if (rawInventory[equippedKey] === undefined) {
       hydratedState.inventory[equippedKey] = hydratedState.inventory[itemKey];

@@ -25,6 +25,7 @@ import {
   BOOTS_COST,
   INN_REST_COST,
   SLINGSHOT_COST,
+  SPEAR_COST,
   SWORD_COST,
 } from "../data.js";
 import { saveGame } from "../saveSystem.js";
@@ -32,6 +33,7 @@ import {
   acceptDarkForestChallenge,
   buyBoots,
   buySlingshot,
+  buySpear,
   buySword,
   enterDarkForest,
   enterTownBuilding,
@@ -491,12 +493,20 @@ function buildBuildingActionButtons(buildingId) {
   }
 
   if (buildingId === "blacksmith") {
-    return makeBuyButton(
-      "buySwordButton",
-      "Buy Sword",
-      SWORD_COST,
-      game.inventory.sword,
-    );
+    return [
+      makeBuyButton(
+        "buySwordButton",
+        "Buy Sword",
+        SWORD_COST,
+        game.inventory.sword,
+      ),
+      makeBuyButton(
+        "buySpearButton",
+        "Buy Spear",
+        SPEAR_COST,
+        game.inventory.spear,
+      ),
+    ].join("\n\n");
   }
 
   if (buildingId === "riversideInn") {
@@ -594,6 +604,7 @@ ${interiorButtons}
     buySlingshotButton: buySlingshot,
     buyBootsButton: buyBoots,
     buySwordButton: buySword,
+    buySpearButton: buySpear,
     restAtInnButton: restAtInn,
   };
 

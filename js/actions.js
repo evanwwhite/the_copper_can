@@ -5,19 +5,16 @@ import {
   BOOTS_COST,
   BOOTS_DAMAGE_REDUCTION,
   COMBAT_ARENA_WIDTH,
-  COMBAT_MOVE_STEP,
-  COMBAT_PLAYER_DAMAGE,
   COMBAT_TICK_MS,
+  COMBAT_TUNING,
   FREE_WILL_COST,
   INN_REST_COST,
-  SLINGSHOT_APPROACH_DAMAGE,
   SLINGSHOT_COST,
-  SLINGSHOT_TICK_INTERVAL,
-  SWORD_ATTACK_BONUS,
+  SPEAR_COST,
   SWORD_COST,
-  SWORD_TICK_INTERVAL,
   combatEnemies,
 } from "./data.js";
+import { pushCombatLog, stepCombat } from "./combatCore.js";
 import { saveGame, clearSave, hydrateGameState } from "./saveSystem.js";
 
 async function renderGame() {
@@ -84,16 +81,19 @@ function getCombatEnemy() {
 }
 
 export function getPlayerCombatStats() {
-  const swordBonus = game.inventory.swordEquipped ? SWORD_ATTACK_BONUS : 0;
+  // The demo arena lends the full kit so the beta is testable before the
+  // player has bought anything.
+  const demo = game.combat.demo;
+  const weapons = ["slingshot", "spear", "sword"].filter(
+    (key) => demo || game.inventory[key],
+  );
 
   return {
-    baseAttackDamage: COMBAT_PLAYER_DAMAGE,
-    swordBonus,
-    attackDamage: COMBAT_PLAYER_DAMAGE + swordBonus,
+    health: game.player.health,
+    maxHealth: game.player.maxHealth,
+    weapons,
+    hasShield: demo || game.inventory.shield,
     damageReduction: game.inventory.bootsEquipped ? BOOTS_DAMAGE_REDUCTION : 0,
-    approachDamage: game.inventory.slingshotEquipped
-      ? SLINGSHOT_APPROACH_DAMAGE
-      : 0,
   };
 }
 
@@ -114,102 +114,36 @@ function resetGameState(overrides = {}) {
   Object.assign(game, hydrateGameState(overrides));
 }
 
-function resolveApproachPhase(enemy) {
-  const approach = enemy.approach ?? {};
-  const mover = approach.mover === "enemy" ? "enemy" : "player";
-  const direction = approach.direction ?? (mover === "enemy" ? "left" : "right");
-  const step = Math.max(1, approach.step ?? COMBAT_MOVE_STEP);
-  const supportStep = Math.max(0, approach.supportStep ?? 0);
-  const stopDistance = Math.max(1, approach.stopDistance ?? 8);
-
-  if (mover === "enemy") {
-    if (direction === "right") {
-      const currentGap = game.combat.playerX - game.combat.enemyX;
-
-      if (currentGap <= stopDistance) return true;
-
-      let closableDistance = currentGap - stopDistance;
-      const enemyMove = Math.min(step, closableDistance);
-      closableDistance -= enemyMove;
-      const playerMove = Math.min(supportStep, closableDistance);
-
-      game.combat.enemyX += enemyMove;
-      game.combat.playerX -= playerMove;
-
-      return game.combat.playerX - game.combat.enemyX <= stopDistance;
-    }
-
-    const currentGap = game.combat.enemyX - game.combat.playerX;
-
-    if (currentGap <= stopDistance) return true;
-
-    let closableDistance = currentGap - stopDistance;
-    const enemyMove = Math.min(step, closableDistance);
-    closableDistance -= enemyMove;
-    const playerMove = Math.min(supportStep, closableDistance);
-
-    game.combat.enemyX -= enemyMove;
-    game.combat.playerX += playerMove;
-
-    return game.combat.enemyX - game.combat.playerX <= stopDistance;
-  }
-
-  if (direction === "left") {
-    const currentGap = game.combat.playerX - game.combat.enemyX;
-
-    if (currentGap <= stopDistance) return true;
-
-    let closableDistance = currentGap - stopDistance;
-    const playerMove = Math.min(step, closableDistance);
-    closableDistance -= playerMove;
-    const enemyMove = Math.min(supportStep, closableDistance);
-
-    game.combat.playerX -= playerMove;
-    game.combat.enemyX += enemyMove;
-
-    return game.combat.playerX - game.combat.enemyX <= stopDistance;
-  }
-
-  const currentGap = game.combat.enemyX - game.combat.playerX;
-
-  if (currentGap <= stopDistance) return true;
-
-  let closableDistance = currentGap - stopDistance;
-  const playerMove = Math.min(step, closableDistance);
-  closableDistance -= playerMove;
-  const enemyMove = Math.min(supportStep, closableDistance);
-
-  game.combat.playerX += playerMove;
-  game.combat.enemyX -= enemyMove;
-
-  return game.combat.enemyX - game.combat.playerX <= stopDistance;
-}
-
 function resolveCombatVictory(enemy) {
   clearCombatTimer();
   game.combat.active = false;
-  game.combat.phase = "victory";
   game.combat.canExit = true;
   game.combat.rewardCopperBits = enemy.rewardCopperBits;
+  game.combat.fightBits += enemy.rewardCopperBits;
   if (enemy.id === "darkTreeWatcher" && !game.combat.demo) {
     game.flags.defeatedDarkTreeWatcher = true;
   }
   game.currencies.copper += enemy.rewardCopperBits;
   game.lastMessage =
     `${enemy.victoryText} You recover ${enemy.rewardCopperBits} copper bits.`;
-  game.combat.message = "The path out of the fight is clear now.";
+  pushCombatLog(
+    game.combat,
+    `> Recovered ${enemy.rewardCopperBits} copper bits.`,
+    "reward",
+  );
 }
 
 function resolveCombatDefeat() {
   clearCombatTimer();
   game.combat.active = false;
-  game.combat.phase = "defeat";
   game.combat.canExit = true;
   game.combat.defeated = true;
   game.combat.rewardCopperBits = 0;
-  game.combat.message = "You are beaten back. There is no shame in retreat.";
 }
 
+// The setInterval is a thin driver: read input state, call the pure reducer,
+// apply the reported player damage, render, and persist only on transitions
+// (never every 180ms).
 async function resolveCombatTick() {
   const enemy = getCombatEnemy();
 
@@ -222,75 +156,120 @@ async function resolveCombatTick() {
 
   const stats = getPlayerCombatStats();
 
-  if (game.combat.phase === "approach") {
-    game.combat.message = enemy.approachText;
-    game.combat.approachTicks += 1;
+  stepCombat(game.combat, enemy, stats, COMBAT_TUNING);
 
-    // The slingshot only weakens the enemy on the approach, and only lands a
-    // shot every third tick so it stays a chip-damage tool rather than a
-    // primary weapon.
-    const slingshotFires =
-      stats.approachDamage > 0 &&
-      game.combat.approachTicks % SLINGSHOT_TICK_INTERVAL === 0;
-
-    if (slingshotFires) {
-      game.combat.enemyHp = Math.max(
-        0,
-        game.combat.enemyHp - stats.approachDamage,
-      );
-      game.combat.message =
-        `${enemy.approachText} Your slingshot stings it for ` +
-        `${stats.approachDamage} damage. ${game.combat.enemyHp} enemy health remains.`;
-
-      if (game.combat.enemyHp === 0) {
-        resolveCombatVictory(enemy);
-        saveGame();
-        await renderGame();
-        return;
-      }
-    }
-
-    if (resolveApproachPhase(enemy)) {
-      game.combat.phase = "attack";
-      game.combat.message = enemy.attackText;
-    }
-  } else if (game.combat.phase === "attack") {
-    game.combat.attackTicks += 1;
-
-    // The sword's bonus only bites every other swing, so the base strike lands
-    // each tick and the extra sword damage lands every SWORD_TICK_INTERVAL ticks.
-    const swordSwings =
-      stats.swordBonus > 0 &&
-      game.combat.attackTicks % SWORD_TICK_INTERVAL === 0;
-    const attackDamage = stats.baseAttackDamage + (swordSwings ? stats.swordBonus : 0);
-
-    game.combat.enemyHp = Math.max(0, game.combat.enemyHp - attackDamage);
-
-    if (game.combat.enemyHp === 0) {
-      resolveCombatVictory(enemy);
-    } else {
-      const damageTaken = Math.max(
-        0,
-        enemy.attackDamage - stats.damageReduction,
-      );
-      game.player.health = Math.max(0, game.player.health - damageTaken);
-
-      if (game.player.health === 0) {
-        resolveCombatDefeat();
-      } else {
-        game.combat.message =
-          `${enemy.attackText} You take ${damageTaken} damage. ` +
-          `${game.combat.enemyHp} enemy health remains. ` +
-          `Your health is now ${game.player.health}/${game.player.maxHealth}.`;
-      }
-    }
+  if (game.combat.playerDamageTaken > 0) {
+    game.player.health = Math.max(
+      0,
+      game.player.health - game.combat.playerDamageTaken,
+    );
   }
+
+  if (game.combat.phase === "victory") {
+    resolveCombatVictory(enemy);
+    saveGame();
+  } else if (game.combat.phase === "defeat") {
+    resolveCombatDefeat();
+    saveGame();
+  } else if (game.combat.ticks % 25 === 0) {
+    saveGame();
+  }
+
+  await renderGame();
+}
+
+// --- Combat input: keys and buttons write state; the tick reads it. ---
+
+export const COMBAT_WEAPON_KEYS = { q: "slingshot", w: "spear", e: "sword" };
+
+export function setCombatWeapon(weaponKey) {
+  if (!game.combat.active) return;
+  const stats = getPlayerCombatStats();
+  if (!stats.weapons.includes(weaponKey)) return;
+  if (game.combat.equippedWeapon === weaponKey) return;
+
+  game.combat.equippedWeapon = weaponKey;
+  pushCombatLog(
+    game.combat,
+    `You ready the ${COMBAT_TUNING.weapons[weaponKey].label}.`,
+    "info",
+  );
+}
+
+export function setCombatTargetZone(zone) {
+  if (!game.combat.active) return;
+  if (zone < 1 || zone > 9) return;
+  game.combat.targetZone = zone;
+}
+
+export function startBrace() {
+  if (!game.combat.active) return;
+  if (game.combat.bracing) return;
+  if (!getPlayerCombatStats().hasShield) return;
+  if (game.combat.guard <= 0) return;
+  game.combat.bracing = true;
+}
+
+export function releaseBrace() {
+  if (!game.combat.bracing) return;
+  game.combat.bracing = false;
+  game.combat.releasedBrace = true;
+}
+
+export async function fleeCombat() {
+  if (!game.combat.active) return;
+
+  clearCombatTimer();
+  game.combat.active = false;
+  game.combat.canExit = true;
+  game.combat.rewardCopperBits = 0;
+  pushCombatLog(
+    game.combat,
+    "You leg it. Strategic. Definitely strategic.",
+    "result",
+  );
 
   saveGame();
   await renderGame();
 }
 
+let combatKeysInstalled = false;
+
+export function installCombatKeyHandlers() {
+  if (combatKeysInstalled || typeof window === "undefined") return;
+  combatKeysInstalled = true;
+
+  window.addEventListener("keydown", (event) => {
+    if (!game.combat.active) return;
+
+    const key = event.key.toLowerCase();
+
+    if (COMBAT_WEAPON_KEYS[key]) {
+      setCombatWeapon(COMBAT_WEAPON_KEYS[key]);
+    } else if (/^[1-9]$/.test(event.key)) {
+      setCombatTargetZone(Number(event.key));
+    } else if (key === "shift") {
+      if (!event.repeat) startBrace();
+    } else if (key === "f") {
+      fleeCombat();
+      return;
+    } else {
+      return;
+    }
+
+    event.preventDefault();
+  });
+
+  window.addEventListener("keyup", (event) => {
+    if (!game.combat.active) return;
+    if (event.key.toLowerCase() === "shift") {
+      releaseBrace();
+    }
+  });
+}
+
 function startCombatLoop() {
+  installCombatKeyHandlers();
   if (runtime.combatTimerId !== null) return;
 
   runtime.combatTimerId = window.setInterval(() => {
@@ -600,6 +579,14 @@ export async function buySword() {
   await renderTownInterior();
 }
 
+export async function buySpear() {
+  await buyGear(
+    "spear",
+    SPEAR_COST,
+    "A long-hafted spear is yours. It keeps trouble at arm's length.",
+  );
+}
+
 export async function restAtInn() {
   if (game.player.health >= game.player.maxHealth) {
     game.lastMessage = "You are already at full health.";
@@ -696,48 +683,52 @@ export async function startDarkTreeFight() {
     ? game.world.currentView
     : "can";
 
-  game.world.screen = "game";
-  game.world.currentView = "combat";
-  game.combat = {
-    ...createCombatState(),
-    active: true,
-    phase: "approach",
-    enemyId: enemy.id,
-    enemyHp: enemy.maxHealth,
-    enemyMaxHp: enemy.maxHealth,
-    playerX: 2,
-    enemyX: COMBAT_ARENA_WIDTH - 12,
-    returnScreen,
-    returnView,
-    message: enemy.introText,
-  };
-
+  beginCombat(enemy, { returnScreen, returnView });
   saveGame();
   startCombatLoop();
   await renderGame();
 }
 
-export async function startCombatDemo() {
-  if (game.combat.active) return;
-
-  const enemy = combatEnemies.darkTreeWatcher;
+function beginCombat(enemy, overrides = {}) {
+  const enemyX = COMBAT_ARENA_WIDTH - 12;
 
   game.world.screen = "game";
   game.world.currentView = "combat";
   game.combat = {
     ...createCombatState(),
     active: true,
-    phase: "approach",
+    phase: "fight",
     enemyId: enemy.id,
     enemyHp: enemy.maxHealth,
     enemyMaxHp: enemy.maxHealth,
     playerX: 2,
-    enemyX: COMBAT_ARENA_WIDTH - 12,
+    enemyX,
+    enemyHomeX: enemyX,
+    slingshotAmmo: COMBAT_TUNING.slingshotAmmoMax,
+    guard: COMBAT_TUNING.guardMax,
+    ...overrides,
+  };
+
+  pushCombatLog(game.combat, enemy.introText, "info");
+  pushCombatLog(
+    game.combat,
+    `You ready the ${COMBAT_TUNING.weapons[game.combat.equippedWeapon].label}.`,
+    "info",
+  );
+
+  installCombatKeyHandlers();
+}
+
+export async function startCombatDemo(enemyId = "darkTreeWatcher") {
+  if (game.combat.active) return;
+
+  const enemy = combatEnemies[enemyId] ?? combatEnemies.darkTreeWatcher;
+
+  beginCombat(enemy, {
     returnScreen: "game",
     returnView: "can",
     demo: true,
-    message: enemy.introText,
-  };
+  });
 
   saveGame();
   startCombatLoop();
@@ -760,6 +751,7 @@ const EQUIPPABLE_ITEMS = {
   slingshot: "slingshot",
   boots: "boots",
   sword: "sword",
+  spear: "spear",
 };
 
 export async function toggleEquip(itemKey) {

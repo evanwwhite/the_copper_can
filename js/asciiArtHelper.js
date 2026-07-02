@@ -9,13 +9,17 @@ export {
   inventoryScreenMassive,
   mapAsset,
   slingshotAsset,
+  spearAsset,
   swordAsset,
 } from "./asciiArt/inventory.js";
 export {
+  boneRattleArt,
+  boneRattleDeadArt,
   darkTreeWatcherArt,
   darkTreeWatcherDeadArt,
   enemy1,
   playerCombatArt,
+  playerCombatPoses,
 } from "./asciiArt/combatSprites.js";
 export {
   buildMapScreenModel,

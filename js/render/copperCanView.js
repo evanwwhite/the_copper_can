@@ -48,12 +48,25 @@ ${makeBox("Copper Can", canLines)}
     <span id="gatherBitButton" class="asciiRealButton">Pick up a copper bit</span>
 
 ${makeBox("COMBAT BETA", [
-  "A practice arena for testing fights.",
+  "A practice arena for the new active combat.",
+  "The full kit is lent to you: slingshot, spear,",
+  "sword, and shield.",
+  "",
+  "Q Slingshot  range 0-98  dmg 1-2   uses rivets",
+  "W Spear      range 0-20  dmg 4-5",
+  "E Sword      range 0-6   dmg 10-12 knocks back",
+  "",
+  "Q/W/E  swap weapon      1-9  aim (numpad layout)",
+  "Shift  hold to brace, release in the '!' wind-up",
+  "       to parry and open the weak spot",
+  "F      flee",
   "",
   `Health: ${game.player.health}/${game.player.maxHealth}`,
 ])}
 
-    <span id="combatDemoButton" class="asciiRealButton">Enter combat demo</span>
+    <span id="combatDemoFoxButton" class="asciiRealButton">Spar: the Fox (easy)</span>
+
+    <span id="combatDemoSkeletonButton" class="asciiRealButton">Spar: the Skeleton (armored)</span>
 
     <span id="canHealButton" class="asciiRealButton">Heal to full</span>
 
@@ -189,9 +202,20 @@ ${makeBox("MESSAGE", [game.lastMessage])}
     gatherBitButton.addEventListener("click", gatherCopperBit);
   }
 
-  const combatDemoButton = document.getElementById("combatDemoButton");
-  if (combatDemoButton) {
-    combatDemoButton.addEventListener("click", startCombatDemo);
+  const combatDemoFoxButton = document.getElementById("combatDemoFoxButton");
+  if (combatDemoFoxButton) {
+    combatDemoFoxButton.addEventListener("click", () =>
+      startCombatDemo("darkTreeWatcher"),
+    );
+  }
+
+  const combatDemoSkeletonButton = document.getElementById(
+    "combatDemoSkeletonButton",
+  );
+  if (combatDemoSkeletonButton) {
+    combatDemoSkeletonButton.addEventListener("click", () =>
+      startCombatDemo("boneRattle"),
+    );
   }
 
   const canHealButton = document.getElementById("canHealButton");
