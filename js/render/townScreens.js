@@ -1,25 +1,11 @@
 import { game } from "../gameState.js";
+import { townScene } from "../asciiArtHelper.js";
 import {
-  anvil,
-  balance,
-  banner,
-  barrel,
-  bed,
-  coalPile,
-  counter,
-  fireplace,
-  furnace,
-  hammer,
-  mug,
-  potions,
-  shelf,
-  table,
-  throne,
-  tongs,
-  townScene,
-  villagerSmall,
-  weaponRack,
-} from "../asciiArtHelper.js";
+  blacksmithInterior,
+  riversideInnInterior,
+  villageHallBase,
+  villageShopInterior,
+} from "../asciiArt/interiors.js";
 import { makeBox } from "../helpers.js";
 import {
   BOOTS_COST,
@@ -41,7 +27,6 @@ import {
   receiveVillageMap,
   restAtInn,
 } from "../actions.js";
-import { getAsciiLines, placeSprite } from "./ascii.js";
 import { escapeHtml, mainContent, setMainContentMode } from "./dom.js";
 import { attachTopBarListeners, renderTopBar } from "./topBar.js";
 
@@ -304,24 +289,8 @@ function attachTownHoverListeners() {
   });
 }
 
-function createRoomCanvas(width = 75, height = 24) {
-  const canvas = Array.from({ length: height }, () =>
-    Array.from({ length: width }, () => " "),
-  );
-
-  for (let column = 0; column < width; column += 1) {
-    canvas[0][column] = column === 0 || column === width - 1 ? "+" : "-";
-    canvas[height - 1][column] = column === 0 || column === width - 1 ? "+" : "-";
-  }
-
-  for (let row = 1; row < height - 1; row += 1) {
-    canvas[row][0] = "|";
-    canvas[row][width - 1] = "|";
-  }
-
-  return canvas;
-}
-
+// Interior room art lives as baked literals in js/asciiArt/interiors.js.
+// Regenerate them with: bun scripts/bakeScenes.mjs emit
 function placeInteriorLines(canvas, lines, x, y) {
   lines.forEach((line, rowOffset) => {
     [...line].forEach((character, columnOffset) => {
@@ -342,66 +311,14 @@ function placeInteriorLines(canvas, lines, x, y) {
   });
 }
 
-function placeInteriorText(canvas, text, x, y) {
-  placeInteriorLines(canvas, [text], x, y);
-}
-
-function placeFurniture(canvas, art, x, y) {
-  placeSprite(canvas, getAsciiLines(art), x, y);
-}
-
-function addRoomTitle(canvas, title) {
-  placeInteriorText(canvas, `[ ${title} ]`, 3, 1);
-}
-
-function addRoomFloor(canvas) {
-  const floorRow = canvas.length - 5;
-
-  for (let column = 1; column < canvas[0].length - 1; column += 1) {
-    canvas[floorRow][column] = "_";
-  }
-}
-
 function buildVillageHallInteriorLines(dialogueStep = 0) {
-  const canvas = createRoomCanvas();
+  const canvas = villageHallBase.split("\n").map(line => [...line]);
   const villageHallDialogue = getVillageHallDialogue();
   const dialogueLines =
     villageHallDialogue[dialogueStep] ??
     villageHallDialogue[villageHallDialogue.length - 1];
   const speechBox = makeBox("VILLAGER", dialogueLines, 33).split("\n");
 
-  addRoomTitle(canvas, "Village Hall");
-  addRoomFloor(canvas);
-  placeFurniture(canvas, banner, 19, 4);
-  placeFurniture(canvas, banner, 44, 4);
-  placeInteriorLines(canvas, [
-    "     ______     ",
-    "  ,-'  ||  '-,  ",
-    " /     ||     \\",
-    "|=----=##=----=|",
-    "|      ||      |",
-    "|      ||      |",
-    "|=----=##=----=|",
-    "|      ||      |",
-    "|      ||      |",
-    "|=----=##=----=|",
-    "|______||______|",
-  ], 2, 2);
-  placeInteriorLines(canvas, [
-    "     ______     ",
-    "  ,-'  ||  '-,  ",
-    " /     ||     \\",
-    "|=----=##=----=|",
-    "|      ||      |",
-    "|      ||      |",
-    "|=----=##=----=|",
-    "|      ||      |",
-    "|      ||      |",
-    "|=----=##=----=|",
-    "|______||______|",
-  ], 57, 2);
-  placeFurniture(canvas, throne, 29, 11);
-  placeSprite(canvas, getAsciiLines(villagerSmall), 18, 15);
   // Anchor the speech box to the bottom of the room so it doesn't obstruct the
   // throne/dais. Its bottom border sits one row above the room's bottom border.
   const speechBoxTop = canvas.length - 1 - speechBox.length;
@@ -411,47 +328,15 @@ function buildVillageHallInteriorLines(dialogueStep = 0) {
 }
 
 function buildRiversideInnInteriorLines() {
-  const canvas = createRoomCanvas();
-
-  addRoomTitle(canvas, "Riverside Inn");
-  addRoomFloor(canvas);
-  placeFurniture(canvas, fireplace, 56, 12);
-  placeFurniture(canvas, barrel, 19, 13);
-  placeFurniture(canvas, table, 31, 16);
-  placeFurniture(canvas, mug, 36, 9);
-  placeFurniture(canvas, bed, 1, 11);
-  placeFurniture(canvas, bed, 1, 13);
-  
-
-  return canvas.map(row => row.join("")).join("\n");
+  return riversideInnInterior;
 }
 
 function buildVillageShopInteriorLines() {
-  const canvas = createRoomCanvas();
-
-  addRoomTitle(canvas, "Village Shop");
-  addRoomFloor(canvas);
-  placeFurniture(canvas, shelf, 1, 9);
-  placeFurniture(canvas, balance, 19, 7);
-  //placeFurniture(canvas, counter, 27, 13);
-  placeFurniture(canvas, potions, 55, 9);
-
-  return canvas.map(row => row.join("")).join("\n");
+  return villageShopInterior;
 }
 
 function buildBlacksmithInteriorLines() {
-  const canvas = createRoomCanvas();
-
-  addRoomTitle(canvas, "Blacksmith");
-  addRoomFloor(canvas);
-  placeFurniture(canvas, tongs, 32, 4);
-  placeFurniture(canvas, hammer, 44, 4);
-  placeFurniture(canvas, furnace, 1, 1);
-  placeFurniture(canvas, coalPile, 17, 11);
-  placeFurniture(canvas, anvil, 36, 12);
-  placeFurniture(canvas, weaponRack, 52, 9);
-
-  return canvas.map(row => row.join("")).join("\n");
+  return blacksmithInterior;
 }
 
 function getTownInteriorScene(buildingId, dialogueStep = 0) {
