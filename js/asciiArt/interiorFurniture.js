@@ -117,7 +117,7 @@ export const furnace = String.raw`
  |##|         |##|
 `;
 
-export const anvil = String.raw`
+export const anvil1 = String.raw`
    ________
   /________\
  (__________)
@@ -184,3 +184,10 @@ export const banner = String.raw`
     \  /
      \/
 `;
+
+export const anvil2 = [
+" _.-------.__ ",
+"\`|       !·\`",
+"   )_____(    ",
+"  '-------'   "
+].join("\n");

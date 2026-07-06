@@ -5,7 +5,7 @@ import {
   riversideInnInterior,
   villageHallBase,
   villageShopInterior,
-} from "../asciiArt/interiors.js";
+} from "../asciiArt/scenes/interiorScenes.js";
 import { makeBox } from "../helpers.js";
 import {
   BOOTS_COST,
@@ -289,7 +289,7 @@ function attachTownHoverListeners() {
   });
 }
 
-// Interior room art lives as baked literals in js/asciiArt/interiors.js.
+// Interior room art lives as baked literals in js/asciiArt/scenes/interiorScenes.js.
 // Regenerate them with: bun scripts/bakeScenes.mjs emit
 function placeInteriorLines(canvas, lines, x, y) {
   lines.forEach((line, rowOffset) => {

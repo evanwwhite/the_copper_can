@@ -5,6 +5,12 @@ import {
   islandOcean,
   islandWorld,
   miniMap1,
+  plains,
+  houseByBeach,
+  windmill,
+  pirateShip,
+  castleBridge,
+  castle,
 } from "../asciiArtHelper.js";
 import { saveGame } from "../saveSystem.js";
 import {
@@ -76,14 +82,50 @@ const MAP_BUILDING_HOVER_REGIONS = [
 
 // Hover regions drawn into the islandWorld art. The village sits along the
 // island's left shore; hovering it surfaces the "Village Minimap" label and
-// clicking it drops the player into the detailed minimap (miniMap1). Rows map
-// to islandWorld.split("\n"); y 26-37 == map.js lines 116-127.
+// clicking it drops the player into the detailed minimap (miniMap1). The box
+// covers the village cluster in islandWorld.split("\n"): rows 27-37, cols 13-38.
 const ISLAND_HOVER_REGIONS = [
   {
     id: "villageMinimap",
     label: "Village Minimap",
     action: () => switchView("map"),
-    parts: [{ x: 8, y: 26, width: 25, height: 12 }],
+    parts: [{ x: 13, y: 27, width: 26, height: 11 }],
+  },
+  {
+    id: "plains",
+    label: "The Plains",
+    action: () => switchView("plains"),
+    parts: [{ x: 51, y: 26, width: 39, height: 6 }],
+  },
+  {
+    id: "houseByBeach",
+    label: "House by the Beach",
+    action: () => switchView("houseByBeach"),
+    parts: [{ x: 88, y: 37, width: 6, height: 2 }],
+  },
+  {
+    id: "windmill",
+    label: "The Windmill",
+    action: () => switchView("windmill"),
+    parts: [{ x: 19, y: 11, width: 7, height: 4 }],
+  },
+  {
+    id: "pirateShip",
+    label: "The Pirate Ship",
+    action: () => switchView("pirateShip"),
+    parts: [{ x: 0, y: 1, width: 11, height: 5 }],
+  },
+  {
+    id: "castleBridge",
+    label: "The Castle Bridge",
+    action: () => switchView("castleBridge"),
+    parts: [{ x: 57, y: 33, width: 3, height: 6 }],
+  },
+  {
+    id: "castle",
+    label: "The Castle",
+    action: () => switchView("castle"),
+    parts: [{ x: 61, y: 36, width: 11, height: 5 }],
   },
 ];
 
@@ -196,6 +238,18 @@ function positionHoverLabel(hoverLabel, sceneElement, region, art) {
   hoverLabel.style.top = `${metrics.top + bottomRow * metrics.lineHeight + 4}px`;
 }
 
+// Map a pointer event to the character cell (column/row) it sits over. Working
+// in cell space instead of DOM targets means the whole region box counts as
+// hoverable - including the blank cells inside it - so the label stays up as
+// long as the cursor is anywhere within the box rather than only over a drawn
+// glyph.
+function cellFromEvent(event, sceneElement, art) {
+  const metrics = getSceneMetrics(sceneElement, art);
+  const column = Math.floor((event.clientX - metrics.left) / metrics.charWidth);
+  const row = Math.floor((event.clientY - metrics.top) / metrics.lineHeight);
+  return { column, row };
+}
+
 function attachSceneHoverListeners(sceneId, regions, art) {
   const sceneElement = document.getElementById(sceneId);
   const hoverLabel = document.getElementById(`${sceneId}Label`);
@@ -204,21 +258,9 @@ function attachSceneHoverListeners(sceneId, regions, art) {
     return;
   }
 
-  const regionForTarget = target => {
-    return regions.find(item => item.id === target.dataset.hoverRegion);
-  };
-
   sceneElement.addEventListener("mousemove", event => {
-    const target = event.target instanceof Element
-      ? event.target.closest(".mapBuildingHover")
-      : null;
-
-    if (!target || !sceneElement.contains(target)) {
-      hideMapHoverLabel(hoverLabel);
-      return;
-    }
-
-    const region = regionForTarget(target);
+    const { column, row } = cellFromEvent(event, sceneElement, art);
+    const region = getRegionAt(regions, column, row);
 
     if (!region) {
       hideMapHoverLabel(hoverLabel);
@@ -235,15 +277,8 @@ function attachSceneHoverListeners(sceneId, regions, art) {
   });
 
   sceneElement.addEventListener("click", event => {
-    const target = event.target instanceof Element
-      ? event.target.closest(".mapBuildingHover")
-      : null;
-
-    if (!target || !sceneElement.contains(target)) {
-      return;
-    }
-
-    const region = regionForTarget(target);
+    const { column, row } = cellFromEvent(event, sceneElement, art);
+    const region = getRegionAt(regions, column, row);
 
     if (region) {
       region.action();
@@ -278,6 +313,33 @@ ${buildHoverScene(scene, regions, "islandScene", "worldMapScene")}
 `;
 
   attachSceneHoverListeners("islandScene", regions, scene);
+}
+
+// Scenes reachable by clicking a landmark on the world map. Each renders its
+// art plus a button back to the world map. The keys double as the currentView
+// value that switchView() sets, so a landmark's action is switchView(<key>).
+export const WORLD_SCENE_ART = {
+  plains,
+  houseByBeach,
+  windmill,
+  pirateShip,
+  castleBridge,
+  castle,
+};
+
+export function renderWorldSceneView(viewName) {
+  setMainContentMode();
+
+  mainContent.innerHTML = `
+${WORLD_SCENE_ART[viewName]}
+
+
+    <span id="sceneReturnButton" class="asciiRealButton">Return to World Map</span>
+`;
+
+  document
+    .getElementById("sceneReturnButton")
+    .addEventListener("click", viewWorldMap);
 }
 
 export function renderForestPathScreen() {

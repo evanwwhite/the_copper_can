@@ -4,7 +4,7 @@ import {
   darkForestOldRoot,
   darkForestPineHollow,
   darkForestWatcherBase,
-} from "../asciiArt/darkForestScenes.js";
+} from "../asciiArt/scenes/darkForestScenes.js";
 import { saveGame } from "../saveSystem.js";
 import { leaveDarkForest, startDarkTreeFight } from "../actions.js";
 import { escapeHtml, mainContent, setMainContentMode } from "./dom.js";
@@ -84,7 +84,7 @@ function getDarkForestSceneIndex() {
   return sceneIndex;
 }
 
-// Scene art lives as baked literals in js/asciiArt/darkForestScenes.js.
+// Scene art lives as baked literals in js/asciiArt/scenes/darkForestScenes.js.
 // Regenerate them with: bun scripts/bakeScenes.mjs emit
 function createWatcherSceneLines() {
   const sceneLines = darkForestWatcherBase.split("\n");

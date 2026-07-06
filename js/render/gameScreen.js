@@ -2,7 +2,12 @@ import { game } from "../gameState.js";
 import { attachTopBarListeners, renderTopBar } from "./topBar.js";
 import { renderCombatView } from "./combatView.js";
 import { renderCopperCanView } from "./copperCanView.js";
-import { renderMapView, renderWorldMapView } from "./worldScreens.js";
+import {
+  renderMapView,
+  renderWorldMapView,
+  renderWorldSceneView,
+  WORLD_SCENE_ART,
+} from "./worldScreens.js";
 import {
   renderPackView,
   renderSaveView,
@@ -25,6 +30,11 @@ export function renderGameScreen() {
     game.flags.unlockedWorldMap
   ) {
     renderWorldMapView();
+  } else if (
+    game.world.currentView in WORLD_SCENE_ART &&
+    game.flags.unlockedWorldMap
+  ) {
+    renderWorldSceneView(game.world.currentView);
   } else if (game.world.currentView === "pack" && game.unlocks.pack) {
     renderPackView();
   } else if (game.world.currentView === "thoughts" && game.unlocks.thoughts) {

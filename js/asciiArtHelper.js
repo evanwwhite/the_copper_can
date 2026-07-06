@@ -42,7 +42,7 @@ export {
 export {
   forest,
   forestTrailSignScene,
-} from "./asciiArt/forestScenes.js";
+} from "./asciiArt/scenes/forestScenes.js";
 export {
   bench,
   blacksmithShop,
@@ -58,9 +58,28 @@ export {
 } from "./asciiArt/townAssets.js";
 export {
   townScene,
-} from "./asciiArt/townScene.js";
+} from "./asciiArt/scenes/townScene.js";
 export {
-  anvil,
+  plains,
+} from "./asciiArt/scenes/plains.js";
+export {
+  houseByBeach,
+} from "./asciiArt/scenes/houseByBeach.js";
+export {
+  windmill,
+} from "./asciiArt/scenes/windmill.js";
+export {
+  pirateShip,
+} from "./asciiArt/scenes/pirateShip.js";
+export {
+  castleBridge,
+} from "./asciiArt/scenes/castleBridge.js";
+export {
+  castle,
+} from "./asciiArt/scenes/castle.js";
+export {
+  anvil1,
+  anvil2,
   balance,
   banner,
   barrel,
