@@ -41,6 +41,7 @@ export function renderTopBar() {
     "town",
     "townInterior",
     "darkForest",
+    "walk",
   ];
 
   if (!screensWithTopBar.includes(game.world.screen)) {

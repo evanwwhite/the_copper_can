@@ -14,6 +14,7 @@ export {
   renderTownScreen,
 } from "./render/townScreens.js";
 export { renderDarkForestScreen } from "./render/darkForestScreen.js";
+export { renderWalkScreen } from "./render/walkScreen.js";
 export {
   renderPackView,
   renderSaveView,

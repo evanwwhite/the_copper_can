@@ -169,20 +169,30 @@ ${makeBox("DISTANT BUZZING", [
 `;
   }
 
-  if (
+  // Before the first venture, gate the prompt on progress + copper. Afterward
+  // keep the button available every visit until the player receives the map,
+  // so a weaponless run can always get back to the woods and finish the story.
+  const canFirstVenture =
     game.inventory.bentMagnet &&
     game.flags.disturbedBeehive &&
-    !game.flags.reachedWoodedPath &&
-    game.currencies.copper >= MAP_UNLOCK_AMOUNT
+    game.currencies.copper >= MAP_UNLOCK_AMOUNT;
+
+  if (
+    !game.inventory.map &&
+    (game.flags.reachedWoodedPath || canFirstVenture)
   ) {
-    content += `
+    if (!game.flags.reachedWoodedPath) {
+      content += `
 ${makeBox("SOMETHING MOVES", [
   "The bent magnet turns in your hand.",
   "",
   "It points past the copper can, toward a path deeper in the woods.",
 ])}
+`;
+    }
 
-    <span id="unlockMapButton" class="asciiRealButton">Venture toward the wooded path</span>
+    content += `
+    <span id="unlockMapButton" class="asciiRealButton">Venture into the woods</span>
 
 `;
   }

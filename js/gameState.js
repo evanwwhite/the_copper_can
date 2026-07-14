@@ -40,6 +40,18 @@ export function createCombatState() {
   };
 }
 
+export function createWalkState() {
+  return {
+    active: false,
+    sceneId: "plains",
+    playerX: 2, // column; the player spawns on the left and walks right
+    facing: 1, // 1 = facing right, -1 = facing left
+    heldDir: 0, // -1/0/1, written by keys, read by the walk tick
+    stepFrame: 0, // current frame in the active walk cycle
+    segment: 1, // which scene in the walk sequence (1..WALK_SEGMENT_LIMIT)
+  };
+}
+
 export const SAVE_VERSION = 2;
 
 export function createInitialGameState() {
@@ -105,6 +117,7 @@ export function createInitialGameState() {
 
     lastMessage: "",
     combat: createCombatState(),
+    walk: createWalkState(),
   };
 }
 
@@ -113,6 +126,7 @@ export const game = createInitialGameState();
 export const runtime = {
   timerId: null,
   combatTimerId: null,
+  walkTimerId: null,
   statusBar:
     typeof document === "undefined"
       ? null

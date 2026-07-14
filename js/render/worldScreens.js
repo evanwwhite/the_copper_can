@@ -16,6 +16,7 @@ import { saveGame } from "../saveSystem.js";
 import {
   continueOnTrail,
   enterDarkForest,
+  enterWalkScene,
   followWoodedPath,
   switchView,
   travelToVillage,
@@ -94,7 +95,7 @@ const ISLAND_HOVER_REGIONS = [
   {
     id: "plains",
     label: "The Plains",
-    action: () => switchView("plains"),
+    action: () => enterWalkScene("plains"),
     parts: [{ x: 51, y: 26, width: 39, height: 6 }],
   },
   {

@@ -8,6 +8,7 @@ import {
   renderTitleRevealScreen,
   renderTownInteriorScreen,
   renderTownScreen,
+  renderWalkScreen,
 } from "./renderHelper.js";
 import { continueGame, startTimer } from "./actions.js";
 
@@ -29,6 +30,8 @@ function boot() {
     renderTownInteriorScreen();
   } else if (game.world.screen === "darkForest") {
     renderDarkForestScreen();
+  } else if (game.world.screen === "walk") {
+    renderWalkScreen();
   } else {
     renderIntroScreen();
   }

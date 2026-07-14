@@ -20,6 +20,7 @@ export {
   enemy1,
   playerCombatArt,
   playerCombatPoses,
+  playerWalkFrames,
 } from "./asciiArt/combatSprites.js";
 export {
   buildMapScreenModel,
@@ -61,6 +62,7 @@ export {
 } from "./asciiArt/scenes/townScene.js";
 export {
   plains,
+  plains2,
 } from "./asciiArt/scenes/plains.js";
 export {
   houseByBeach,

@@ -1,6 +1,7 @@
 import {
   createCombatState,
   createInitialGameState,
+  createWalkState,
   game,
   SAVE_VERSION,
 } from "./gameState.js";
@@ -88,6 +89,7 @@ export function hydrateGameState(saveData = {}) {
     saveVersion: SAVE_VERSION,
     lastMessage: migratedSaveData.lastMessage ?? defaults.lastMessage,
     combat: mergeDefined(createCombatState(), migratedSaveData.combat),
+    walk: mergeDefined(createWalkState(), migratedSaveData.walk),
   };
 
   // Saves from the brief pry-bar era: map the renamed weapon onto the spear.
@@ -128,6 +130,7 @@ export function serializeGameState(state = game) {
     saveVersion: SAVE_VERSION,
     lastMessage: hydratedState.lastMessage,
     combat: { ...hydratedState.combat },
+    walk: { ...hydratedState.walk },
   };
 
   SAVE_GROUP_KEYS.forEach((key) => {

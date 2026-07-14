@@ -32,6 +32,16 @@ export const COMBAT_TUNING = {
   // Weapon bands are [minGap, maxGap]. The sword's ceiling is per-enemy
   // (`reach`), so its band max here is a fallback.
   weapons: {
+    // Unarmed floor. Automatically used when the player owns no weapon so an
+    // empty-handed can can still deal damage and clear the fox to progress.
+    fists: {
+      label: "Bare hands",
+      band: [0, 4],
+      cooldownTicks: 6,
+      damage: [1, 2],
+      usesAmmo: false,
+      knockback: false,
+    },
     slingshot: {
       label: "Slingshot",
       band: [0, COMBAT_ARENA_WIDTH],

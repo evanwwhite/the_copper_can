@@ -15,6 +15,7 @@ import {
   combatEnemies,
 } from "./data.js";
 import { pushCombatLog, stepCombat } from "./combatCore.js";
+import { playerWalkFrames } from "./asciiArtHelper.js";
 import { saveGame, clearSave, hydrateGameState } from "./saveSystem.js";
 
 async function renderGame() {
@@ -60,6 +61,11 @@ async function renderTownInterior() {
 async function renderDarkForest() {
   const { renderDarkForestScreen } = await import("./renderHelper.js");
   renderDarkForestScreen();
+}
+
+async function renderWalk() {
+  const { renderWalkScreen } = await import("./render/walkScreen.js");
+  renderWalkScreen();
 }
 
 async function refreshCopperCounter() {
@@ -264,6 +270,113 @@ export function installCombatKeyHandlers() {
     if (!game.combat.active) return;
     if (event.key.toLowerCase() === "shift") {
       releaseBrace();
+    }
+  });
+}
+
+// --- Walkable scenes -------------------------------------------------------
+
+const WALK_TICK_MS = 90;
+let walkKeysInstalled = false;
+
+async function loadWalkScene(sceneId) {
+  const { getWalkScene } = await import("./render/walkScenes.js");
+  return getWalkScene(sceneId);
+}
+
+async function getWalkSegmentLimit() {
+  const { WALK_SEGMENT_LIMIT } = await import("./render/walkScenes.js");
+  return WALK_SEGMENT_LIMIT;
+}
+
+function clearWalkTimer() {
+  if (runtime.walkTimerId === null) return;
+
+  window.clearInterval(runtime.walkTimerId);
+  runtime.walkTimerId = null;
+}
+
+// Enter a walkable scene, spawning on the left edge facing right. `segment` is
+// the 1-based position in the walk sequence; a fresh entry (e.g. from the world
+// map) resets it to 1, while edge transitions carry the incremented count.
+export async function enterWalkScene(sceneId = "plains", segment = 1) {
+  const scene = await loadWalkScene(sceneId);
+
+  game.world.screen = "walk";
+  game.walk.active = true;
+  game.walk.sceneId = sceneId;
+  game.walk.playerX = scene.minX;
+  game.walk.facing = 1;
+  game.walk.heldDir = 0;
+  game.walk.stepFrame = 0;
+  game.walk.segment = segment;
+  saveGame();
+
+  await renderWalk();
+}
+
+// Advance the player one column in `direction` (-1/1), handling scene edges.
+// Walking off the right edge loads the scene's `next` (respawning on the left)
+// until the segment limit is reached; otherwise the player clamps at the bounds.
+async function stepWalk(direction) {
+  const scene = await loadWalkScene(game.walk.sceneId);
+  const nextX = game.walk.playerX + direction;
+
+  if (direction > 0 && nextX > scene.maxX) {
+    const limit = await getWalkSegmentLimit();
+    if (scene.next && game.walk.segment < limit) {
+      await enterWalkScene(scene.next, game.walk.segment + 1);
+    }
+    return;
+  }
+
+  game.walk.playerX = Math.max(scene.minX, Math.min(scene.maxX, nextX));
+  game.walk.facing = direction < 0 ? -1 : 1;
+  const frames = playerWalkFrames[direction < 0 ? "left" : "right"];
+  game.walk.stepFrame = (game.walk.stepFrame + 1) % frames.length;
+  saveGame();
+  await renderWalk();
+}
+
+// Single discrete step, used by the on-screen walk buttons.
+export async function moveWalk(direction) {
+  if (!game.walk.active) return;
+  if (direction !== -1 && direction !== 1) return;
+  await stepWalk(direction);
+}
+
+function startWalkLoop() {
+  if (runtime.walkTimerId !== null) return;
+
+  runtime.walkTimerId = window.setInterval(() => {
+    if (game.world.screen !== "walk" || !game.walk.active) return;
+    if (game.walk.heldDir === 0) return;
+    stepWalk(game.walk.heldDir).catch(() => clearWalkTimer());
+  }, WALK_TICK_MS);
+}
+
+export function installWalkKeyHandlers() {
+  startWalkLoop();
+
+  if (walkKeysInstalled || typeof window === "undefined") return;
+  walkKeysInstalled = true;
+
+  window.addEventListener("keydown", (event) => {
+    if (!game.walk.active) return;
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+
+    game.walk.heldDir = event.key === "ArrowLeft" ? -1 : 1;
+    game.walk.facing = game.walk.heldDir;
+    event.preventDefault();
+  });
+
+  window.addEventListener("keyup", (event) => {
+    if (!game.walk.active) return;
+    if (
+      (event.key === "ArrowLeft" && game.walk.heldDir < 0) ||
+      (event.key === "ArrowRight" && game.walk.heldDir > 0)
+    ) {
+      game.walk.heldDir = 0;
     }
   });
 }

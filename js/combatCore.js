@@ -327,6 +327,16 @@ export function stepCombat(combat, enemy, playerStats, tuning = COMBAT_TUNING) {
       weaponKey = fallback ?? null;
     }
 
+    // Unarmed floor: a can with no weapons still throws bare hands once it's
+    // closed to melee, so a weaponless player can never be hard-stuck.
+    if (
+      !weaponKey &&
+      playerStats.weapons.length === 0 &&
+      canWeaponFire(combat, enemy, "fists", tuning)
+    ) {
+      weaponKey = "fists";
+    }
+
     if (weaponKey) {
       playerAttack(combat, enemy, weaponKey, tuning);
     }

@@ -33,7 +33,7 @@ export const tree2 = String.raw`
 export const tree3 = String.raw`
        .----.        .---.
    .--(_     )--. .-(    _)-.
- .(              V     .-.   ).
+ .(              )     .-.   ).
 (       .--.          (_       )
  '-.       _)   .__.    .----.'
     .----.--\\ / /  '.-(      )-.
@@ -53,7 +53,7 @@ export const tree3 = String.raw`
 export const tree4 = String.raw`
        .----.        .---.
    .--(_     )--. .-(    _)-.
- .(              V     .-.   ).
+ .(              )     .-.   ).
 (       .--.          (_       )
 '-.       _)   .__.         .-'
    _'                       '_.
