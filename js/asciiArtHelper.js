@@ -80,6 +80,27 @@ export {
   castle,
 } from "./asciiArt/scenes/castle.js";
 export {
+  desert,
+} from "./asciiArt/scenes/desert.js";
+export {
+  lake,
+} from "./asciiArt/scenes/lake.js";
+export {
+  woodenBridge,
+} from "./asciiArt/scenes/woodenBridge.js";
+export {
+  rubble,
+} from "./asciiArt/scenes/rubble.js";
+export {
+  tallTree,
+} from "./asciiArt/scenes/tallTree.js";
+export {
+  beach,
+} from "./asciiArt/scenes/beach.js";
+export {
+  logCabin,
+} from "./asciiArt/scenes/interiorScenes.js";
+export {
   anvil1,
   anvil2,
   balance,

@@ -69,11 +69,6 @@ async function renderWalk() {
 }
 
 async function refreshCopperCounter() {
-  if (game.world.screen === "game") {
-    await renderGame();
-    return;
-  }
-
   const { attachTopBarListeners, renderTopBar } = await import(
     "./renderHelper.js"
   );

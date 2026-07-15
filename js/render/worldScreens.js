@@ -11,6 +11,13 @@ import {
   pirateShip,
   castleBridge,
   castle,
+  desert,
+  lake,
+  woodenBridge,
+  rubble,
+  tallTree,
+  beach,
+  logCabin,
 } from "../asciiArtHelper.js";
 import { saveGame } from "../saveSystem.js";
 import {
@@ -87,6 +94,33 @@ const MAP_BUILDING_HOVER_REGIONS = [
 // covers the village cluster in islandWorld.split("\n"): rows 27-37, cols 13-38.
 const ISLAND_HOVER_REGIONS = [
   {
+    // The tall pine in the island's northern interior.
+    id: "tallTree",
+    label: "The Tall Tree",
+    action: () => switchView("tallTree"),
+    parts: [
+      { x: 43, y: 6, width: 4, height: 1 },
+      { x: 43, y: 7, width: 4, height: 1 },
+      { x: 43, y: 8, width: 4, height: 1 },
+      { x: 43, y: 9, width: 4, height: 1 },
+      { x: 43, y: 10, width: 4, height: 1 },
+      { x: 43, y: 11, width: 3, height: 1 },
+    ],
+  },
+  {
+    // The shoreline marker on the island's western edge.
+    id: "beach",
+    label: "The Beach",
+    action: () => switchView("beach"),
+    parts: [
+      { x: 4, y: 17, width: 3, height: 1 },
+      { x: 5, y: 18, width: 2, height: 1 },
+      { x: 6, y: 19, width: 2, height: 1 },
+      { x: 6, y: 20, width: 2, height: 1 },
+      { x: 6, y: 21, width: 2, height: 1 },
+    ],
+  },
+  {
     id: "villageMinimap",
     label: "Village Minimap",
     action: () => switchView("map"),
@@ -99,6 +133,29 @@ const ISLAND_HOVER_REGIONS = [
     parts: [{ x: 51, y: 26, width: 39, height: 6 }],
   },
   {
+    // The small lake near the island's center.
+    id: "lake",
+    label: "The Lake",
+    action: () => switchView("lake"),
+    parts: [
+      { x: 56, y: 17, width: 8, height: 1 },
+      { x: 60, y: 18, width: 9, height: 1 },
+    ],
+  },
+  {
+    // The desert settlement in the island's east-central interior.
+    id: "desert",
+    label: "The Desert",
+    action: () => switchView("desert"),
+    parts: [
+      { x: 66, y: 19, width: 20, height: 1 },
+      { x: 52, y: 20, width: 36, height: 1 },
+      { x: 51, y: 21, width: 28, height: 1 },
+      { x: 54, y: 22, width: 37, height: 1 },
+      { x: 54, y: 23, width: 35, height: 1 },
+    ],
+  },
+  {
     id: "houseByBeach",
     label: "House by the Beach",
     action: () => switchView("houseByBeach"),
@@ -109,6 +166,26 @@ const ISLAND_HOVER_REGIONS = [
     label: "The Windmill",
     action: () => switchView("windmill"),
     parts: [{ x: 19, y: 11, width: 7, height: 4 }],
+  },
+  {
+    // The short wooden bridge in the island's northern interior.
+    id: "woodenBridge",
+    label: "The Wooden Bridge",
+    action: () => switchView("woodenBridge"),
+    parts: [{ x: 48, y: 11, width: 6, height: 1 }],
+  },
+  {
+    // The ruined settlement on the island's eastern side.
+    id: "rubble",
+    label: "The Rubble",
+    action: () => switchView("rubble"),
+    parts: [
+      { x: 64, y: 11, width: 27, height: 1 },
+      { x: 64, y: 12, width: 27, height: 1 },
+      { x: 64, y: 13, width: 28, height: 1 },
+      { x: 64, y: 14, width: 25, height: 1 },
+      { x: 64, y: 15, width: 27, height: 1 },
+    ],
   },
   {
     id: "pirateShip",
@@ -129,6 +206,24 @@ const ISLAND_HOVER_REGIONS = [
     parts: [{ x: 61, y: 36, width: 11, height: 5 }],
   },
 ];
+
+// Clickable details within individual world scenes. The log cabin door is
+// slightly wider than its visible outline so it is easy to enter.
+const WORLD_SCENE_HOVER_REGIONS = {
+  houseByBeach: [
+    {
+      id: "logCabinDoor",
+      label: "Enter Log Cabin",
+      action: () => switchView("logCabin"),
+      parts: [
+        { x: 50, y: 26, width: 11, height: 1 },
+        { x: 50, y: 27, width: 10, height: 1 },
+        { x: 50, y: 28, width: 10, height: 1 },
+        { x: 50, y: 29, width: 10, height: 1 },
+      ],
+    },
+  ],
+};
 
 // Composite `foreground` onto `background`, anchored at (offsetX, offsetY).
 // Foreground spaces are treated as transparent so the background art (the
@@ -326,21 +421,41 @@ export const WORLD_SCENE_ART = {
   pirateShip,
   castleBridge,
   castle,
+  desert,
+  lake,
+  woodenBridge,
+  rubble,
+  tallTree,
+  beach,
+  logCabin,
 };
 
 export function renderWorldSceneView(viewName) {
   setMainContentMode();
 
+  const sceneArt = WORLD_SCENE_ART[viewName];
+  const regions = WORLD_SCENE_HOVER_REGIONS[viewName];
+  const returnView = viewName === "logCabin" ? "houseByBeach" : "worldMap";
+  const returnLabel = viewName === "logCabin"
+    ? "Return to House by the Beach"
+    : "Return to World Map";
+
   mainContent.innerHTML = `
-${WORLD_SCENE_ART[viewName]}
+${regions
+  ? buildHoverScene(sceneArt, regions, "worldScene", "worldMapScene")
+  : sceneArt}
 
 
-    <span id="sceneReturnButton" class="asciiRealButton">Return to World Map</span>
+    <span id="sceneReturnButton" class="asciiRealButton">${returnLabel}</span>
 `;
+
+  if (regions) {
+    attachSceneHoverListeners("worldScene", regions, sceneArt);
+  }
 
   document
     .getElementById("sceneReturnButton")
-    .addEventListener("click", viewWorldMap);
+    .addEventListener("click", () => switchView(returnView));
 }
 
 export function renderForestPathScreen() {

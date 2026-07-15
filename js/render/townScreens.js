@@ -31,10 +31,10 @@ import { escapeHtml, mainContent, setMainContentMode } from "./dom.js";
 import { attachTopBarListeners, renderTopBar } from "./topBar.js";
 
 const TOWN_BUILDING_HOVER_REGIONS = [
-  { id: "riversideInn", label: "Riverside Inn", x: 7, y: 15, width: 23, height: 10, canEnter: true },
-  { id: "villageHall", label: "Village Hall", x: 56, y: 16, width: 27, height: 9, canEnter: true },
-  { id: "villageShop", label: "Village Shop", x: 34, y: 18, width: 14, height: 7, canEnter: true },
-  { id: "blacksmith", label: "Blacksmith", x: 76, y: 20, width: 27, height: 12, canEnter: true },
+  { id: "riversideInn", label: "Riverside Inn", x: 6, y: 23, width: 16, height: 6, canEnter: true },
+  { id: "villageHall", label: "Village Hall", x: 54, y: 21, width: 20, height: 5, canEnter: true },
+  { id: "villageShop", label: "Village Shop", x: 29, y: 22, width: 10, height: 5, canEnter: true },
+  { id: "blacksmith", label: "Blacksmith", x: 77, y: 28, width: 21, height: 5, canEnter: true },
 ];
 
 const LOCKABLE_BUILDING_IDS = ["riversideInn", "villageShop", "blacksmith"];
@@ -53,11 +53,14 @@ function isBuildingLocked(id) {
 const DARK_FOREST_HOVER_REGION = {
   id: "darkForest",
   label: "Dark Forest",
-  x: 49,
-  y: 5,
-  width: 10,
-  height: 2,
   canEnter: true,
+  parts: [
+    { x: 44, y: 4, width: 9, height: 4 },
+    { x: 44, y: 8, width: 8, height: 1 },
+    { x: 44, y: 9, width: 8, height: 1 },
+    { x: 44, y: 10, width: 8, height: 1 },
+    { x: 44, y: 11, width: 8, height: 1 },
+  ],
 };
 
 const VILLAGE_HALL_CHALLENGE_DIALOGUE = [
@@ -150,6 +153,17 @@ function getActiveTownHoverRegions() {
 
 function getTownBuildingRegion(x, y) {
   return getActiveTownHoverRegions().find(region => {
+    if (region.parts) {
+      return region.parts.some(part => {
+        return (
+          x >= part.x &&
+          x < part.x + part.width &&
+          y >= part.y &&
+          y < part.y + part.height
+        );
+      });
+    }
+
     return (
       x >= region.x &&
       x < region.x + region.width &&
@@ -207,8 +221,11 @@ function getTownSceneMetrics(townSceneElement) {
 
 function positionTownHoverLabel(hoverLabel, townSceneElement, region) {
   const metrics = getTownSceneMetrics(townSceneElement);
-  const centerColumn = region.x + region.width / 2;
-  const bottomRow = region.y + region.height;
+  const parts = region.parts ?? [region];
+  const leftColumn = Math.min(...parts.map(part => part.x));
+  const rightColumn = Math.max(...parts.map(part => part.x + part.width));
+  const bottomRow = Math.max(...parts.map(part => part.y + part.height));
+  const centerColumn = (leftColumn + rightColumn) / 2;
 
   hoverLabel.style.left = `${metrics.left + centerColumn * metrics.charWidth}px`;
   hoverLabel.style.top = `${metrics.top + bottomRow * metrics.lineHeight + 4}px`;
