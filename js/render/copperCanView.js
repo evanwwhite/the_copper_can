@@ -48,18 +48,18 @@ ${makeBox("Copper Can", canLines)}
     <span id="gatherBitButton" class="asciiRealButton">Pick up a copper bit</span>
 
 ${makeBox("COMBAT BETA", [
-  "A practice arena for the new active combat.",
-  "The full kit is lent to you: slingshot, spear,",
-  "sword, and shield.",
+  "A practice scene for walking combat.",
+  "The full kit is lent to you. Enemies approach",
+  "on the same road where you move and fight.",
   "",
-  "Q Slingshot  range 0-98  dmg 1-2   uses rivets",
-  "W Spear      range 0-20  dmg 4-5",
-  "E Sword      range 0-6   dmg 10-12 knocks back",
+  "Q Slingshot   dmg 1-2   shield / anti-air",
+  "W Sword       dmg 4-6   shield / short reach",
+  "E Heavy sword dmg 8-11  knockback / long recovery",
+  "R Spear       dmg 6-8   reach / knockback / recovery",
   "",
-  "Q/W/E  swap weapon      1-9  aim (numpad layout)",
-  "Shift  hold to brace, release in the '!' wind-up",
-  "       to parry and open the weak spot",
-  "F      flee",
+  "Arrows move       Space/Z attacks",
+  "Q/W/E/R swap weapon or stance mid-fight",
+  "Shift holds the shield; release during [!] to parry",
   "",
   `Health: ${game.player.health}/${game.player.maxHealth}`,
 ])}

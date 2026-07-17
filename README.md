@@ -65,6 +65,8 @@ bits_intro_game/
 │   ├── gameState.js
 │   ├── helpers.js
 │   ├── main.js
+│   ├── sceneCombatCore.js
+│   ├── sceneCombatData.js
 │   ├── render/
 │   │   ├── ascii.js
 │   │   ├── combatView.js
@@ -101,7 +103,9 @@ The shell page for the game. It defines:
 The active application code.
 
 - `main.js`: boots the game, loads saves, and routes to the correct starting screen
-- `gameState.js`: defines `createInitialGameState()`, grouped state defaults, combat defaults, and runtime DOM/timer references
+- `gameState.js`: defines grouped state defaults, including the unified walk/scene-combat state
+- `sceneCombatCore.js`: headless scene tick for movement, attacks, enemy state machines, projectiles, blocking, parries, and rewards
+- `sceneCombatData.js`: reusable weapon styles, enemy types, and scene-combat tuning
 - `data.js`: gameplay constants, thought entries, and combat enemy data
 - `actions.js`: player actions, state mutations, combat flow, route changes, reward handling, saving, and resetting
 - `renderHelper.js`: barrel export for the render modules
@@ -133,7 +137,8 @@ State is grouped in `gameState.js`:
 - `inventory`: carried items such as the copper can, bent magnet, and map
 - `unlocks`: visible tabs and systems
 - `flags`: story and one-time progression state
-- `combat`: active fight state, return screen/view, enemy health, and messages
+- `walk`: the active scene, player position/input, enemy instances, projectiles, combat resources, and defeated spawn IDs
+- `combat`: legacy arena state retained so older saves can still hydrate safely
 
 ## Current Feature Map
 
@@ -175,7 +180,7 @@ Village Hall dialogue changes by progression state:
 
 ### Dark Forest And Combat
 
-The dark forest contains the Rusty Iron Sign / tree watcher encounter. Combat has an approach phase, attack phase, victory state, and a return target so the player can exit back to the correct world screen. Once defeated, the dark forest revisits as quiet and no longer offers the fight.
+The dark forest watcher now enters the same walkable scene system used by the plains. The player moves left/right, changes weapon or stance during the encounter, attacks explicitly, and reads each enemy's `[!]` telegraph before blocking or parrying. Enemies approach, lunge forward, return, and recover in place. Once the watcher is defeated, the dark forest revisits as quiet and no longer offers the fight.
 
 ### Save
 
@@ -191,7 +196,7 @@ A special transition screen triggered after the key early systems are active.
 
 ## Important Values To Tweak
 
-Most tuning lives in `js/data.js`.
+World/progression tuning lives in `js/data.js`; scene-combat tuning lives in `js/sceneCombatData.js`. Enemy placement is authored in `js/render/walkScenes.js` with stable IDs, enemy types, horizontal coordinates, and optional render lanes.
 
 ```js
 export const BENT_MAGNET_COST = 15;
@@ -199,10 +204,9 @@ export const BEEHIVE_UNLOCK_AMOUNT = 20;
 export const MAP_UNLOCK_AMOUNT = 35;
 export const FREE_WILL_COST = 10;
 export const SAVE_KEY = "theCopperCanPrototypeSave";
-export const COMBAT_ARENA_WIDTH = 98;
-export const COMBAT_ARENA_HEIGHT = 16;
-export const COMBAT_TICK_MS = 180;
-export const COMBAT_PLAYER_DAMAGE = 2;
+export const SCENE_TICK_MS = 90;
+export const SCENE_WEAPONS = { /* damage, range, recovery, shield, knockback */ };
+export const SCENE_ENEMY_TYPES = { /* speed, health, defense, attack, matchups */ };
 ```
 
 Note: `MAP_UNLOCK_AMOUNT` still exists as a tuning constant, but the current visible Map tab is awarded through the Village Hall reward flow.

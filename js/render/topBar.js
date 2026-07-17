@@ -1,6 +1,6 @@
 import { game } from "../gameState.js";
 import { centerText } from "../helpers.js";
-import { switchView } from "../actions.js";
+import { switchView, viewWorldMap } from "../actions.js";
 import { statusBar } from "./dom.js";
 
 function fitVisibleText(text, width) {
@@ -49,7 +49,10 @@ export function renderTopBar() {
     return;
   }
 
-  const showHealthBar = game.flags.disturbedBeehive || game.combat.active;
+  const showHealthBar =
+    game.flags.disturbedBeehive ||
+    game.combat.active ||
+    (game.world.screen === "walk" && game.walk.active);
 
   let currencyText = `${game.currencies.copper}c`;
 
@@ -173,13 +176,20 @@ ${bottomBorder}
 }
 
 export function attachTopBarListeners() {
-  if (game.combat.active) {
+  if (game.combat.active || (game.world.screen === "walk" && game.walk.active)) {
     return;
   }
 
   const mapTab = document.getElementById("mapTab");
   if (mapTab) {
-    mapTab.addEventListener("click", () => switchView("map"));
+    mapTab.addEventListener("click", () => {
+      if (game.world.currentView === "map") {
+        viewWorldMap();
+        return;
+      }
+
+      switchView("map");
+    });
   }
 
   const packTab = document.getElementById("packTab");

@@ -1,6 +1,3 @@
-// houseByBeach scene art. Backticks in the original sketch were converted to
-// apostrophes so the block can live in a String.raw template literal.
-
 export const houseByBeach = String.raw`                          _(        ''.                                                             
                       .=('(      .     )               _ __                                         
                      (     (.__.:-'-_.'               ( (  )'.   _ ____                    ____ _   

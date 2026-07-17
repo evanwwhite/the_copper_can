@@ -1,6 +1,3 @@
-// castle scene art. Backticks in the original sketch were converted to
-// apostrophes so the block can live in a String.raw template literal.
-
 export const castle = String.raw`                                __                                  ____ _                          
                               ('  ).                              _(    '.)                         
                              (     ).                            ( (    ) ))                        

@@ -1,4 +1,4 @@
-import { createCombatState, game, runtime } from "./gameState.js";
+import { createCombatState, createWalkState, game, runtime } from "./gameState.js";
 import {
   BEEHIVE_UNLOCK_AMOUNT,
   BENT_MAGNET_COST,
@@ -15,7 +15,16 @@ import {
   combatEnemies,
 } from "./data.js";
 import { pushCombatLog, stepCombat } from "./combatCore.js";
-import { playerWalkFrames } from "./asciiArtHelper.js";
+import {
+  createSceneEnemies,
+  pushSceneLog,
+  stepSceneCombat,
+} from "./sceneCombatCore.js";
+import {
+  getAvailableSceneWeapons,
+  SCENE_TICK_MS,
+  SCENE_WEAPONS,
+} from "./sceneCombatData.js";
 import { saveGame, clearSave, hydrateGameState } from "./saveSystem.js";
 
 async function renderGame() {
@@ -271,7 +280,6 @@ export function installCombatKeyHandlers() {
 
 // --- Walkable scenes -------------------------------------------------------
 
-const WALK_TICK_MS = 90;
 let walkKeysInstalled = false;
 
 async function loadWalkScene(sceneId) {
@@ -294,42 +302,159 @@ function clearWalkTimer() {
 // Enter a walkable scene, spawning on the left edge facing right. `segment` is
 // the 1-based position in the walk sequence; a fresh entry (e.g. from the world
 // map) resets it to 1, while edge transitions carry the incremented count.
-export async function enterWalkScene(sceneId = "plains", segment = 1) {
+export async function enterWalkScene(sceneId = "plains", segment = 1, overrides = {}) {
   const scene = await loadWalkScene(sceneId);
+  const previousDefeated = game.walk.defeatedSpawnIds ?? {};
+  const defeatedSpawnIds = { ...previousDefeated };
+  const availableSpawns = (scene.enemySpawns ?? []).filter((spawn) => {
+    return !spawn.storyFlag || !game.flags[spawn.storyFlag];
+  });
+  const nextWalk = createWalkState();
+  const weapons = getAvailableSceneWeapons(game.inventory, overrides.demo);
+  const previousWeapon = game.walk.equippedWeapon;
 
   game.world.screen = "walk";
-  game.walk.active = true;
-  game.walk.sceneId = sceneId;
-  game.walk.playerX = scene.minX;
-  game.walk.facing = 1;
-  game.walk.heldDir = 0;
-  game.walk.stepFrame = 0;
-  game.walk.segment = segment;
+  game.walk = {
+    ...nextWalk,
+    active: true,
+    sceneId,
+    playerX: overrides.playerX ?? scene.minX,
+    facing: overrides.facing ?? 1,
+    segment,
+    bounds: { minX: scene.minX, maxX: scene.maxX },
+    equippedWeapon: weapons.includes(previousWeapon)
+      ? previousWeapon
+      : weapons[0],
+    enemies: createSceneEnemies(
+      availableSpawns,
+      overrides.demo ? {} : defeatedSpawnIds,
+    ),
+    defeatedSpawnIds,
+    demo: Boolean(overrides.demo),
+    returnScreen: overrides.returnScreen ?? "game",
+    returnView: overrides.returnView ?? "worldMap",
+  };
+  game.walk.encounterComplete = game.walk.enemies.length === 0;
+  if (game.walk.enemies.length > 0) {
+    pushSceneLog(
+      game.walk,
+      "Movement and combat share the road now. The shapes ahead are moving.",
+      "info",
+    );
+  }
   saveGame();
 
   await renderWalk();
 }
 
-// Advance the player one column in `direction` (-1/1), handling scene edges.
-// Walking off the right edge loads the scene's `next` (respawning on the left)
-// until the segment limit is reached; otherwise the player clamps at the bounds.
-async function stepWalk(direction) {
-  const scene = await loadWalkScene(game.walk.sceneId);
-  const nextX = game.walk.playerX + direction;
+export function getPlayerSceneCombatStats() {
+  return {
+    health: game.player.health,
+    maxHealth: game.player.maxHealth,
+    weapons: getAvailableSceneWeapons(game.inventory, game.walk.demo),
+    // The can's lid is the baseline shield. Weapon definitions determine
+    // whether the current grip leaves a hand free to use it.
+    hasShield: true,
+    damageReduction: game.inventory.bootsEquipped ? BOOTS_DAMAGE_REDUCTION : 0,
+  };
+}
 
-  if (direction > 0 && nextX > scene.maxX) {
-    const limit = await getWalkSegmentLimit();
-    if (scene.next && game.walk.segment < limit) {
-      await enterWalkScene(scene.next, game.walk.segment + 1);
-    }
+export const SCENE_WEAPON_KEYS = {
+  q: "slingshot",
+  w: "sword",
+  e: "heavySword",
+  r: "spear",
+};
+
+export function setSceneWeapon(weaponKey) {
+  if (!game.walk.active || game.walk.phase === "defeat") return;
+  const stats = getPlayerSceneCombatStats();
+  if (!stats.weapons.includes(weaponKey)) return;
+  if (game.walk.equippedWeapon === weaponKey) return;
+
+  game.walk.equippedWeapon = weaponKey;
+  game.walk.bracing = false;
+  pushSceneLog(
+    game.walk,
+    `You ready the ${SCENE_WEAPONS[weaponKey].label}.`,
+    "info",
+  );
+}
+
+export function requestSceneAttack() {
+  if (!game.walk.active || game.walk.phase === "defeat") return;
+  game.walk.attackRequested = true;
+}
+
+export function startSceneBrace() {
+  if (!game.walk.active || game.walk.phase === "defeat") return;
+  const weapon = SCENE_WEAPONS[game.walk.equippedWeapon];
+  if (!weapon?.canUseShield || game.walk.guard <= 0) return;
+  if (game.walk.recoveryTimer > 0 || game.walk.hurtTimer > 0) return;
+  game.walk.bracing = true;
+}
+
+export function releaseSceneBrace() {
+  if (!game.walk.bracing) return;
+  game.walk.bracing = false;
+  game.walk.releasedBrace = true;
+}
+
+function applySceneRewards(rewards) {
+  rewards.forEach((reward) => {
+    game.currencies.copper += reward.copperBits;
+    game.walk.bitsEarned += reward.copperBits;
+    if (reward.storyFlag) game.flags[reward.storyFlag] = true;
+  });
+}
+
+async function resolveWalkTick() {
+  if (!game.walk.active || game.walk.phase === "defeat") return;
+  const scene = await loadWalkScene(game.walk.sceneId);
+  const stats = getPlayerSceneCombatStats();
+
+  stepSceneCombat(game.walk, scene, stats);
+
+  if (game.walk.playerDamageTaken > 0) {
+    game.player.health = Math.max(
+      0,
+      game.player.health - game.walk.playerDamageTaken,
+    );
+  }
+  if (game.walk.rewards.length > 0) applySceneRewards(game.walk.rewards);
+
+  if (game.player.health <= 0) {
+    game.walk.phase = "defeat";
+    game.walk.defeated = true;
+    game.walk.inCombat = false;
+    game.walk.heldDir = 0;
+    game.walk.bracing = false;
+    pushSceneLog(game.walk, "The road tilts sideways. You are done fighting.", "hurt");
+    saveGame();
+    await renderWalk();
     return;
   }
 
-  game.walk.playerX = Math.max(scene.minX, Math.min(scene.maxX, nextX));
-  game.walk.facing = direction < 0 ? -1 : 1;
-  const frames = playerWalkFrames[direction < 0 ? "left" : "right"];
-  game.walk.stepFrame = (game.walk.stepFrame + 1) % frames.length;
-  saveGame();
+  game.walk.phase = game.walk.inCombat
+    ? "fight"
+    : game.walk.encounterComplete
+      ? "complete"
+      : "explore";
+
+  if (game.walk.heldDir > 0 && game.walk.playerX >= scene.maxX) {
+    const limit = await getWalkSegmentLimit();
+    if (scene.next && game.walk.segment < limit) {
+      await enterWalkScene(scene.next, game.walk.segment + 1);
+      return;
+    }
+  }
+
+  if (
+    game.walk.rewards.length > 0 ||
+    game.walk.ticks % 20 === 0
+  ) {
+    saveGame();
+  }
   await renderWalk();
 }
 
@@ -337,7 +462,10 @@ async function stepWalk(direction) {
 export async function moveWalk(direction) {
   if (!game.walk.active) return;
   if (direction !== -1 && direction !== 1) return;
-  await stepWalk(direction);
+  game.walk.heldDir = direction;
+  game.walk.facing = direction;
+  await resolveWalkTick();
+  game.walk.heldDir = 0;
 }
 
 function startWalkLoop() {
@@ -345,9 +473,8 @@ function startWalkLoop() {
 
   runtime.walkTimerId = window.setInterval(() => {
     if (game.world.screen !== "walk" || !game.walk.active) return;
-    if (game.walk.heldDir === 0) return;
-    stepWalk(game.walk.heldDir).catch(() => clearWalkTimer());
-  }, WALK_TICK_MS);
+    resolveWalkTick().catch(() => clearWalkTimer());
+  }, SCENE_TICK_MS);
 }
 
 export function installWalkKeyHandlers() {
@@ -358,10 +485,20 @@ export function installWalkKeyHandlers() {
 
   window.addEventListener("keydown", (event) => {
     if (!game.walk.active) return;
-    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+    const key = event.key.toLowerCase();
 
-    game.walk.heldDir = event.key === "ArrowLeft" ? -1 : 1;
-    game.walk.facing = game.walk.heldDir;
+    if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+      game.walk.heldDir = event.key === "ArrowLeft" ? -1 : 1;
+      game.walk.facing = game.walk.heldDir;
+    } else if (SCENE_WEAPON_KEYS[key]) {
+      setSceneWeapon(SCENE_WEAPON_KEYS[key]);
+    } else if ((event.code === "Space" || key === "z") && !event.repeat) {
+      requestSceneAttack();
+    } else if (key === "shift" && !event.repeat) {
+      startSceneBrace();
+    } else {
+      return;
+    }
     event.preventDefault();
   });
 
@@ -372,6 +509,8 @@ export function installWalkKeyHandlers() {
       (event.key === "ArrowRight" && game.walk.heldDir > 0)
     ) {
       game.walk.heldDir = 0;
+    } else if (event.key.toLowerCase() === "shift") {
+      releaseSceneBrace();
     }
   });
 }
@@ -770,7 +909,7 @@ export async function travelToVillage() {
 }
 
 export async function startDarkTreeFight() {
-  if (game.combat.active) return;
+  if (game.walk.active) return;
   if (game.flags.defeatedDarkTreeWatcher) {
     game.lastMessage = "The fox has already been driven off.";
     saveGame();
@@ -783,7 +922,6 @@ export async function startDarkTreeFight() {
     return;
   }
 
-  const enemy = combatEnemies.darkTreeWatcher;
   const returnScreen = game.world.screen === "darkForest"
     ? "darkForest"
     : "game";
@@ -791,10 +929,10 @@ export async function startDarkTreeFight() {
     ? game.world.currentView
     : "can";
 
-  beginCombat(enemy, { returnScreen, returnView });
-  saveGame();
-  startCombatLoop();
-  await renderGame();
+  await enterWalkScene("darkForestCombat", 1, {
+    returnScreen,
+    returnView,
+  });
 }
 
 function beginCombat(enemy, overrides = {}) {
@@ -828,19 +966,59 @@ function beginCombat(enemy, overrides = {}) {
 }
 
 export async function startCombatDemo(enemyId = "darkTreeWatcher") {
-  if (game.combat.active) return;
+  if (game.walk.active) return;
+  const sceneId = enemyId === "boneRattle"
+    ? "combatDemoSkeleton"
+    : "combatDemoFox";
 
-  const enemy = combatEnemies[enemyId] ?? combatEnemies.darkTreeWatcher;
-
-  beginCombat(enemy, {
+  await enterWalkScene(sceneId, 1, {
     returnScreen: "game",
     returnView: "can",
     demo: true,
   });
+}
+
+export async function exitWalkScene() {
+  if (game.world.screen !== "walk") return;
+
+  const { defeated, demo, returnScreen, returnView } = game.walk;
+  clearWalkTimer();
+  game.walk.active = false;
+  game.walk.heldDir = 0;
+  game.walk.bracing = false;
+
+  if (defeated) {
+    game.player.health = game.player.maxHealth;
+    game.lastMessage = demo
+      ? "Practice over. The dents were educational."
+      : "You wake in town, patched up and pointed away from the road.";
+    game.world.screen = demo ? "game" : "town";
+    game.world.currentView = demo ? "can" : game.world.currentView;
+  } else {
+    game.world.screen = returnScreen || "game";
+    game.world.currentView = returnView || "worldMap";
+  }
 
   saveGame();
-  startCombatLoop();
-  await renderGame();
+
+  if (game.world.screen === "darkForest") {
+    await renderDarkForest();
+  } else if (game.world.screen === "town") {
+    await renderTown();
+  } else {
+    await renderGame();
+  }
+}
+
+export async function restartSceneEncounter() {
+  if (!game.walk.demo) return;
+  const sceneId = game.walk.sceneId;
+  game.player.health = game.player.maxHealth;
+  await enterWalkScene(sceneId, 1, {
+    returnScreen: "game",
+    returnView: "can",
+    demo: true,
+  });
 }
 
 export async function exitCombatDemo() {

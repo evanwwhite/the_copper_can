@@ -1,14 +1,28 @@
 import { game } from "../gameState.js";
 import {
+  axe1,
   bentMagnetAsset,
   bootsAsset,
+  bootsAsset2,
   buildThoughtsScreenArt,
   copperCanAsset,
   inventoryScreenMassive,
+  largeSword1,
   mapAsset,
+  shield1,
+  shield2,
+  shield3,
+  shield4,
   slingshotAsset,
   spearAsset,
   swordAsset,
+  sword2,
+  sword3,
+  sword4,
+  sword5,
+  sword6,
+  sword7,
+  torch,
 } from "../asciiArtHelper.js";
 import { thoughts } from "../data.js";
 import { makeBox } from "../helpers.js";
@@ -72,6 +86,23 @@ function buildPackInventoryArt() {
     { has: game.inventory.boots, art: bootsAsset, col: 4, row: 0, equip: "boots" },
     { has: game.inventory.sword, art: swordAsset, col: 5, row: 0, equip: "sword" },
     { has: game.inventory.spear, art: spearAsset, col: 0, row: 1, equip: "spear" },
+
+    // Temporary test inventory: these assets are shown until their individual
+    // acquisition flags are added to the game state.
+    { has: true, art: axe1, col: 1, row: 1 },
+    { has: true, art: sword2, col: 2, row: 1 },
+    { has: true, art: sword3, col: 3, row: 1 },
+    { has: true, art: sword4, col: 4, row: 1 },
+    { has: true, art: sword5, col: 5, row: 1 },
+    { has: true, art: sword6, col: 0, row: 2 },
+    { has: true, art: sword7, col: 1, row: 2 },
+    { has: true, art: largeSword1, col: 2, row: 2 },
+    { has: true, art: shield1, col: 3, row: 2 },
+    { has: true, art: shield2, col: 4, row: 2 },
+    { has: true, art: shield3, col: 5, row: 2 },
+    { has: true, art: shield4, col: 0, row: 3 },
+    { has: true, art: torch, col: 1, row: 3 },
+    { has: true, art: bootsAsset2, col: 2, row: 3 },
   ];
 
   const overlays = [];

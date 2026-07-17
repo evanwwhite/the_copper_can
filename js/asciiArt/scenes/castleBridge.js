@@ -1,6 +1,3 @@
-// castleBridge scene art. Backticks in the original sketch were converted to
-// apostrophes so the block can live in a String.raw template literal.
-
 export const castleBridge = String.raw`
                ( (    ))(    ))                                                                     
                 '-(__.''-(__.'                                                                      

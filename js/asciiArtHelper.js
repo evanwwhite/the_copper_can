@@ -3,14 +3,28 @@ export {
   introTitleArt,
 } from "./asciiArt/titles.js";
 export {
+  axe1,
   bentMagnetAsset,
   bootsAsset,
+  bootsAsset2,
   copperCanAsset,
   inventoryScreenMassive,
+  largeSword1,
   mapAsset,
+  shield1,
+  shield2,
+  shield3,
+  shield4,
   slingshotAsset,
   spearAsset,
   swordAsset,
+  sword2,
+  sword3,
+  sword4,
+  sword5,
+  sword6,
+  sword7,
+  torch,
 } from "./asciiArt/inventory.js";
 export {
   boneRattleArt,
@@ -34,7 +48,6 @@ export {
 export {
   elderPine,
   layeredPineLarge,
-  path,
   tree1,
   tree2,
   tree3,
@@ -44,6 +57,9 @@ export {
   forest,
   forestTrailSignScene,
 } from "./asciiArt/scenes/forestScenes.js";
+export {
+  cave,
+} from "./asciiArt/scenes/cave.js";
 export {
   bench,
   blacksmithShop,

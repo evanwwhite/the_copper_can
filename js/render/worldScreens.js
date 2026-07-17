@@ -2,6 +2,7 @@ import { game } from "../gameState.js";
 import {
   forest,
   forestTrailSignScene,
+  cave,
   islandOcean,
   islandWorld,
   miniMap1,
@@ -40,33 +41,25 @@ import { attachTopBarListeners, renderTopBar } from "./topBar.js";
 // without highlighting the surrounding art.
 const MAP_BUILDING_HOVER_REGIONS = [
   {
-    // The little can shape "││ __  ()/ __││" in the bottom-left corner.
+    // The Copper Can marker in the lower-left of the map.
     id: "copperCan",
     label: "The Copper Can",
     action: visitCopperCan,
-    parts: [{ x: 3, y: 24, width: 15, height: 1 }],
+    parts: [{ x: 6, y: 22, width: 10, height: 5 }],
   },
   {
-    // The path ")),___--'_ ││" winding through the forest.
+    // The winding path marker near the center of the map.
     id: "woodedPath",
     label: "The Wooded Path",
     action: travelToWoodedPath,
-    parts: [{ x: 12, y: 21, width: 13, height: 1 }],
+    parts: [{ x: 17, y: 19, width: 15, height: 5 }],
   },
   {
-    // The castle/keep in the middle-right of the map.
+    // The compact village marker in the center of the map.
     id: "village",
     label: "The Village",
     action: travelToVillage,
-    parts: [
-      { x: 33, y: 11, width: 9, height: 1 },
-      { x: 31, y: 12, width: 28, height: 1 },
-      { x: 30, y: 13, width: 20, height: 1 },
-      { x: 27, y: 14, width: 20, height: 1 },
-      { x: 29, y: 15, width: 19, height: 1 },
-      { x: 41, y: 16, width: 11, height: 1 },
-      { x: 28, y: 17, width: 26, height: 1 },
-    ],
+    parts: [{ x: 32, y: 12, width: 16, height: 6 }],
   },
   {
     // The little tree "│/~~\│" up near the top.
@@ -76,14 +69,14 @@ const MAP_BUILDING_HOVER_REGIONS = [
     parts: [{ x: 35, y: 7, width: 15, height: 1 }],
   },
   {
-    // The swirl "'`---'__" in the upper-left.
+    // The small marker along the map's right edge.
     id: "worldMap",
     label: "The World Beyond",
     action: viewWorldMap,
     parts: [
-      { x: 11, y: 12, width: 6, height: 1 },
-      { x: 6, y: 13, width: 13, height: 1 },
-      { x: 1, y: 14, width: 8, height: 1 },
+      { x: 49, y: 13, width: 10, height: 1 },
+      { x: 48, y: 14, width: 11, height: 1 },
+      { x: 49, y: 15, width: 10, height: 1 },
     ],
   },
 ];
@@ -93,6 +86,13 @@ const MAP_BUILDING_HOVER_REGIONS = [
 // clicking it drops the player into the detailed minimap (miniMap1). The box
 // covers the village cluster in islandWorld.split("\n"): rows 27-37, cols 13-38.
 const ISLAND_HOVER_REGIONS = [
+  {
+    // The small cave entrance in the island's northern interior.
+    id: "cave",
+    label: "The Cave",
+    action: () => switchView("cave"),
+    parts: [{ x: 32, y: 15, width: 9, height: 3 }],
+  },
   {
     // The tall pine in the island's northern interior.
     id: "tallTree",
@@ -415,6 +415,7 @@ ${buildHoverScene(scene, regions, "islandScene", "worldMapScene")}
 // art plus a button back to the world map. The keys double as the currentView
 // value that switchView() sets, so a landmark's action is switchView(<key>).
 export const WORLD_SCENE_ART = {
+  cave,
   plains,
   houseByBeach,
   windmill,

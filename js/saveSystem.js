@@ -107,6 +107,31 @@ export function hydrateGameState(saveData = {}) {
     ),
   };
 
+  const walkDefaults = createWalkState();
+  if (
+    !["fists", "slingshot", "sword", "heavySword", "spear"].includes(
+      hydratedState.walk.equippedWeapon,
+    )
+  ) {
+    hydratedState.walk.equippedWeapon = walkDefaults.equippedWeapon;
+  }
+  ["enemies", "projectiles", "effects", "rewards", "log"].forEach((key) => {
+    if (!Array.isArray(hydratedState.walk[key])) {
+      hydratedState.walk[key] = walkDefaults[key];
+    }
+  });
+  if (
+    !hydratedState.walk.defeatedSpawnIds ||
+    typeof hydratedState.walk.defeatedSpawnIds !== "object" ||
+    Array.isArray(hydratedState.walk.defeatedSpawnIds)
+  ) {
+    hydratedState.walk.defeatedSpawnIds = {};
+  }
+  hydratedState.walk.bounds = mergeDefined(
+    walkDefaults.bounds,
+    hydratedState.walk.bounds,
+  );
+
   SAVE_GROUP_KEYS.forEach((key) => {
     hydratedState[key] = mergeDefined(defaults[key], migratedSaveData[key]);
   });

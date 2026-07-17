@@ -43,16 +43,51 @@ export function createCombatState() {
 export function createWalkState() {
   return {
     active: false,
+    phase: "explore", // explore | fight | complete | defeat
     sceneId: "plains",
     playerX: 2, // column; the player spawns on the left and walks right
     facing: 1, // 1 = facing right, -1 = facing left
     heldDir: 0, // -1/0/1, written by keys, read by the walk tick
     stepFrame: 0, // current frame in the active walk cycle
     segment: 1, // which scene in the walk sequence (1..WALK_SEGMENT_LIMIT)
+    bounds: { minX: 1, maxX: 94 },
+
+    // Walking and combat share this scene state. Input handlers only write
+    // requests/held values; the scene tick consumes them.
+    enemies: [],
+    projectiles: [],
+    effects: [],
+    equippedWeapon: "sword",
+    attackRequested: false,
+    attackCooldown: 0,
+    attackFrame: 0,
+    recoveryTimer: 0,
+    hurtTimer: 0,
+    bracing: false,
+    releasedBrace: false,
+    guard: 100,
+    slingshotAmmo: 6,
+    ammoRegenCounter: 0,
+    inCombat: false,
+    encounterComplete: false,
+    defeated: false,
+    defeatedSpawnIds: {},
+    rewards: [],
+    playerDamageTaken: 0,
+    bitsEarned: 0,
+    message: "",
+    log: [],
+    ticks: 0,
+    nextEffectId: 0,
+    nextProjectileId: 0,
+
+    demo: false,
+    returnScreen: "game",
+    returnView: "worldMap",
   };
 }
 
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
 
 export function createInitialGameState() {
   return {

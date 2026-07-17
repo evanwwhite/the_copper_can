@@ -44,6 +44,10 @@ pre {
   min-width: 900px;
 }
 
+#mainContent.sceneCombatView {
+  min-width: 980px;
+}
+
 #mainContent.copperCanView {
   position: relative;
   min-width: 980px;
@@ -156,7 +160,9 @@ pre {
 }
 
 .combatWeaponButton.combatEquipped,
-#combatBraceButton.combatEquipped {
+#combatBraceButton.combatEquipped,
+.sceneWeaponButton.combatEquipped,
+#sceneBraceButton.combatEquipped {
   background-color: #c9b98a;
   border-color: #111111;
 }
@@ -168,6 +174,41 @@ pre {
 .combatWeaponButton.combatUnowned {
   opacity: 0.25;
   text-decoration: line-through;
+}
+
+.sceneWeaponButton.combatUnowned,
+#sceneBraceButton.combatUnowned {
+  opacity: 0.3;
+  text-decoration: line-through;
+  pointer-events: none;
+}
+
+#sceneCombatShell pre {
+  margin: 0 0 4px 0;
+}
+
+#sceneControls {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+  font-family: Consolas, "Courier New", monospace;
+}
+
+.sceneControlGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-start;
+}
+
+#sceneEndControls {
+  margin-top: 8px;
+}
+
+.sceneControlHint {
+  color: #666666;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 12px;
 }
 
 .combatZoneGrid {
