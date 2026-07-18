@@ -52,13 +52,12 @@ ${makeBox("COMBAT BETA", [
   "The full kit is lent to you. Enemies approach",
   "on the same road where you move and fight.",
   "",
-  "Q Slingshot   dmg 1-2   shield / anti-air",
-  "W Sword       dmg 4-6   shield / short reach",
-  "E Heavy sword dmg 8-11  knockback / long recovery",
-  "R Spear       dmg 6-8   reach / knockback / recovery",
+  "Q Long range: slingshot / ammo / anti-air",
+  "W One-handed: sword and Copper Can lid",
+  "E Heavy: two-handed sword or spear",
   "",
-  "Arrows move       Space/Z attacks",
-  "Q/W/E/R swap weapon or stance mid-fight",
+  "Arrows move; attacks happen automatically in range",
+  "Q/W/E ready a stance; repeat E to cycle heavy styles",
   "Shift holds the shield; release during [!] to parry",
   "",
   `Health: ${game.player.health}/${game.player.maxHealth}`,
@@ -67,6 +66,8 @@ ${makeBox("COMBAT BETA", [
     <span id="combatDemoFoxButton" class="asciiRealButton">Spar: the Fox (easy)</span>
 
     <span id="combatDemoSkeletonButton" class="asciiRealButton">Spar: the Skeleton (armored)</span>
+
+    <span id="combatDemoMagpieButton" class="asciiRealButton">Spar: the Wire Magpie (airborne)</span>
 
     <span id="canHealButton" class="asciiRealButton">Heal to full</span>
 
@@ -225,6 +226,15 @@ ${makeBox("MESSAGE", [game.lastMessage])}
   if (combatDemoSkeletonButton) {
     combatDemoSkeletonButton.addEventListener("click", () =>
       startCombatDemo("boneRattle"),
+    );
+  }
+
+  const combatDemoMagpieButton = document.getElementById(
+    "combatDemoMagpieButton",
+  );
+  if (combatDemoMagpieButton) {
+    combatDemoMagpieButton.addEventListener("click", () =>
+      startCombatDemo("wireMagpie"),
     );
   }
 

@@ -180,7 +180,7 @@ Village Hall dialogue changes by progression state:
 
 ### Dark Forest And Combat
 
-The dark forest watcher now enters the same walkable scene system used by the plains. The player moves left/right, changes weapon or stance during the encounter, attacks explicitly, and reads each enemy's `[!]` telegraph before blocking or parrying. Enemies approach, lunge forward, return, and recover in place. Once the watcher is defeated, the dark forest revisits as quiet and no longer offers the fight.
+The dark forest watcher now enters the same walkable scene system used by the plains. The player moves left/right, readies a Q/W/E weapon stance, and attacks automatically whenever the current weapon has a valid target in range. Each enemy's `[!]` telegraph gives the player time to retreat, block, or parry. Enemies approach, lunge forward, return, and recover in place. Once the watcher is defeated, the dark forest revisits as quiet and no longer offers the fight.
 
 ### Save
 

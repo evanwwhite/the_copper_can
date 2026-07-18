@@ -1,3 +1,7 @@
+// DEPRECATED: renderer for the legacy arena-combat prototype. Active combat is
+// rendered by walkScreen.js. Retained temporarily for save compatibility and
+// reference; do not add new combat presentation here. See combat.md.
+
 import { game } from "../gameState.js";
 import {
   COMBAT_ARENA_HEIGHT,

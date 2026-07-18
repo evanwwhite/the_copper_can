@@ -20,6 +20,7 @@ pre {
 
 #aroundStatusBar {
   z-index: 100;
+  line-height: 0;
 }
 
 #statusBar {
@@ -99,7 +100,62 @@ pre {
   background-color: #eeebe7;
 }
 
+.packInventoryStage {
+  position: relative;
+  display: inline-block;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 1em;
+  line-height: 1.2;
+}
+
+.packInventoryArt {
+  margin: 0;
+}
+
+.packItemHoverRegion {
+  position: absolute;
+  box-sizing: border-box;
+  cursor: help;
+}
+
+.packItemEquippable {
+  cursor: pointer;
+}
+
+.packItemHoverRegion:hover,
+.packItemHoverRegion:focus-visible {
+  outline: 1px solid #7a4a00;
+  background: rgba(201, 185, 138, 0.18);
+}
+
+.packItemTooltip {
+  position: fixed;
+  z-index: 1000;
+  margin: 0;
+  padding: 4px;
+  border: 1px solid #464c54;
+  background: #fbfaf8;
+  color: #111111;
+  pointer-events: auto;
+  box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.2);
+  font-family: Consolas, "Courier New", monospace;
+}
+
+.packItemTooltip pre {
+  margin: 0 0 8px;
+  white-space: pre;
+}
+
+.packItemTooltip[hidden] {
+  display: none;
+}
+
 /* --- Combat screen: arena / status strip / scrolling log / controls --- */
+
+#combatShell,
+#sceneCombatShell {
+  white-space: normal;
+}
 
 #combatShell pre {
   margin: 0 0 4px 0;

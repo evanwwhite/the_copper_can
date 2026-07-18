@@ -1,6 +1,10 @@
-// The active combat reducer specced in combat.md. No DOM, no localStorage,
-// no timers in here — stepCombat takes state and mutates it one tick forward,
-// so it can be driven headless and tuned offline.
+// DEPRECATED: legacy arena-combat reducer retained temporarily for save
+// compatibility and reference. Active combat development belongs in
+// sceneCombatCore.js, sceneCombatData.js, and render/walkScreen.js. Do not add
+// new mechanics here. See combat.md.
+//
+// No DOM, localStorage, or timers live in this reducer; stepCombat takes state
+// and mutates it one tick forward.
 
 import { COMBAT_TUNING } from "./data.js";
 

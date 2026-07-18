@@ -1,191 +1,251 @@
-# Combat Design — Lane Sequencing
+# Combat Design — Scene Combat
 
-A rewrite of combat from a 1v1 duel into a **deliberate reading puzzle**: the
-player advances rightward down a lane, facing a formation of enemies, and the
-skill is solving the **order** to kill them given weapon switch costs and shared
+## Status
+
+This document is the source of truth for active combat development.
+
+Combat takes place inside the same horizontally walkable ASCII scenes used for
+exploration. New combat work belongs in:
+
+- `js/sceneCombatCore.js` — headless movement, targeting, attacks, defense, and
+  enemy state machines.
+- `js/sceneCombatData.js` — weapon, stance, enemy, and timing definitions.
+- `js/render/walkScreen.js` — scene composition, combat HUD, controls, and
+  animation selection.
+
+`js/combatCore.js` and `js/render/combatView.js` are the deprecated arena-combat
+prototype. They remain temporarily for save compatibility and reference, but
+must not receive new mechanics or content.
+
+## Combat Pitch
+
+Combat is a slow, readable spacing game about deciding **when to advance, when
+to hold position or retreat, and which of three weapon stances to ready**.
+
+The player does not press an attack button. The readied weapon attacks
+automatically whenever a living enemy in front of the player is inside that
+weapon's valid range and the weapon is ready. Enemies use their own ranges and
+telegraphed attack clocks. Positioning therefore decides which side is able to
+attack and which risks being hit.
+
+The player's deliberate inputs are:
+
+- Move left or right.
+- Stop moving and hold position.
+- Switch among the Q, W, and E weapon stances.
+- Use the equipped shield or defensive item when the current stance permits it.
+
+## Core Loop
+
+1. Read the enemies ahead: their silhouettes, distance, movement, and attack
+   telegraphs.
+2. Select the stance whose range, damage, and defensive tradeoff fit the threat.
+3. Advance until the chosen weapon can attack, or hold back and let an enemy
+   enter its range.
+4. The weapon auto-attacks while its target remains in range. Its cooldown and
+   recovery still matter; automatic does not mean continuous damage every tick.
+5. Move, switch stance, or time a defense before the enemy's telegraphed hit.
+6. Defeat the formation, collect its rewards, and continue through the scene.
+
+The intended skill is planning and spacing, not repeatedly pressing an attack
+button or aiming individual swings.
+
+## Time and Movement
+
+Combat runs in real time on the scene tick. Enemy movement, telegraphs,
+cooldowns, and attacks continue while the player waits or switches equipment.
+The pace should remain slow enough that silhouettes and `[!]` telegraphs can be
+read reliably.
+
+Movement is horizontal. The player may:
+
+- advance to bring a short-range stance into play;
+- hold position to preserve a favorable range;
+- retreat to create space, avoid a heavy hit, or buy time for a cooldown.
+
+Living ground enemies block the player from walking through them. Airborne
+enemies may use a separate render/target lane, but the player does not move
+vertically.
+
+## Automatic Attacks
+
+The currently readied stance continuously looks for the nearest valid living
+target in front of the player. An automatic attack begins only when:
+
+- the target is inside the weapon's minimum and maximum range;
+- the weapon's cooldown and recovery have finished;
+- the player is not hurt or committed to an incompatible defensive action;
+- the stance has any required resource, such as slingshot ammunition.
+
+Melee attacks resolve against their selected target. Projectiles travel through
+the scene and hit the first valid enemy in their lane. When no target is in the
+weapon's range, the player holds the weapon ready rather than swinging at empty
+air.
+
+Enemies independently attack when the player is within their reach and their
+attack clock completes. A player weapon being out of range does not prevent an
+enemy from attacking.
+
+## The Three Stances
+
+Q, W, and E are combat stance slots, not four or more individual weapon
+hotkeys. The item or item combination equipped into each stance determines its
+exact damage, range, animation, and defensive options.
+
+### Q — Long Range
+
+The initial Q stance is the **slingshot**.
+
+- Uses both hands.
+- Has the longest player attack range.
+- Deals less damage than melee alternatives.
+- Consumes ammunition.
+- Cannot use a shield while readied because both hands are occupied.
+- Best for softening or defeating enemies before they can close the distance.
+
+Running out of ammunition stops its automatic attacks. Ammo recovery or refill
+rules remain a tuning decision, but the current ammo count must always be
+visible in combat.
+
+### W — One-Handed Pairing
+
+W readies a combination of one-handed items. The baseline pairing is **sword
+and shield**; future pairings may combine another one-handed weapon, shield,
+tool, or defensive item.
+
+- Deals reliable close-range damage.
+- Keeps the off hand available.
+- Supports active defense when a shield is equipped.
+- Trades the raw damage and reach of the E stance for protection and
+  flexibility.
+
+This is the only baseline stance that can block with a shield. A correctly
+timed defense reduces part of an incoming telegraphed hit. Poor timing leaves
+the player exposed or spends a limited guard resource without preventing the
+full attack.
+
+The exact input window—hold-to-guard, timed press, or press/release timing—will
+be finalized during the defense polish pass. The invariant is that defense is
+active and timed, not a permanent passive reduction from merely owning a
+shield.
+
+### E — Heavy Two-Handed
+
+E readies one heavy two-handed weapon, initially a **two-handed sword or
+spear**, depending on the equipped loadout.
+
+- Deals more damage than the W pairing.
+- May offer greater reach, armor penetration, stagger, or knockback.
+- Has longer attack recovery.
+- Cannot use a shield while readied.
+- Usually exposes the player to more damage if the attack is mistimed or the
+  enemy survives the commitment.
+
+The two-handed sword and spear should feel distinct even though they share the
+E stance: the sword favors damage and impact, while the spear favors reach and
 spacing.
 
-## Core loop
+## Weapons Are Always Visible
 
-The player controls a character in a lane wider than the normal screen, made of
-**a few vertical rows** (2–3). The character does **not** auto-run; the player
-**chooses when to advance** (a discrete, telegraphed "step in") and which **row**
-to occupy. The extra screen width is the **reaction runway** — enemies are
-visible and identifiable well before they are in kill range, giving the player
-time to read the formation and plan.
+Inside a combat scene, the player's currently readied weapon or item pairing is
+drawn at all times—not only during an attack frame. Walking, standing, attacking,
+recovering, blocking, and being hurt each use a pose that preserves the current
+equipment silhouette.
 
-The player does **not** swing manually: the equipped weapon **auto-attacks**
-whatever is in its range. The player's inputs are therefore **weapon choice,
-position (row + advance), and active defense** — not individual swings. This
-keeps the focus on sequencing and spacing rather than attack timing.
+Changing Q/W/E should immediately change the player's visible pose. This gives
+the stance choice a readable physical presence and lets the player verify the
+active loadout without relying only on HUD text.
 
-The one-sentence pitch of the skill: **read the formation, plan the kill order,
-pick your weapon and row, and defend while the auto-attack does the work.**
+Outside combat, exploration may continue to use the ordinary walk cycle.
 
-## Time model — real-time, slow clocks
+## Enemy Behavior and Telegraphs
 
-Enemy clocks tick on a **real timer**, but slowly enough to read and plan.
-Dithering costs you (enemies keep advancing/firing), but there is no twitch
-pressure. This needs a running tick loop, not a turn queue. Menus/weapon-swaps
-do **not** pause time — committing to a switch mid-fight is itself a decision.
+Each enemy definition controls:
 
-## The decision
+- awareness/aggro range;
+- movement speed and collision size;
+- attack reach and damage;
+- telegraph, active, return, and recovery timings;
+- defense and weapon/stance matchups;
+- reward and optional story flag.
 
-Enemies are **obvious** (type read at a glance from far away). The hard part is
-**sequencing** — what order to kill them, which weapon for each, and when to
-advance. For that to be the fun, four things must hold:
+An enemy approaches until the player is in its attack range, visibly
+telegraphs, attacks, returns to its origin, and recovers. The telegraph must be
+long and visually clear enough to support a weapon switch, retreat, or timed
+shield response.
 
-1. **Switching costs something** — else order is free and there is no puzzle.
-2. **Position is shared** — where you stand is good for some threats and bad for
-   others *at the same time*. Killing one enemy changes whether your position is
-   survivable for the rest.
-3. **Threats are on visible clocks** — each enemy shows when it will act, so the
-   player can plan a sequence that beats every clock.
-4. **Advancing is a commitment** — closing on one enemy walks you into another's
-   range. Retreat is possible but expensive.
+Different enemy types should create positioning questions rather than only
+larger health totals. Examples include fast short-range enemies, armored enemies
+that reward a committed E attack, and airborne enemies best handled by Q.
 
-## Weapons
+## Damage and Failure
 
-Hybrid rule: **weakness decides what kills, range decides where it's safe.**
+Wrong positioning or an ill-timed stance switch should normally cost health,
+not cause an instant loss. Longer E recovery can increase incoming damage, W
+can trade damage for safety, and Q can trade ammunition and lower damage for
+distance.
 
-| Weapon  | Kills (weakness)                              | Owns range   | Switch-in | Rhythm / role                        |
-|---------|-----------------------------------------------|--------------|-----------|--------------------------------------|
-| Sword   | Sword-enemies; finishes wounded spear-enemies | Point-blank  | Fast      | Quick, repeatable — the **closer**   |
-| Spear   | Spear-enemies (out-reaches); holds swords out | Mid/keep-away| Medium    | Slow wind-up thrust — the **spacer** |
-| Ranged  | Ranged-enemies; softens anything approaching  | Far          | Slow      | Limited ammo — the **opener**        |
+On defeat, the existing scene flow may return the player to safety and restore
+health according to whether the encounter is practice or story content.
 
-Ideal rhythm reads *ranged (opener) → spear (spacer) → sword (closer)*. Good
-formations deliberately scramble that ideal order; switch cost punishes going
-out of rhythm.
+## Inventory Contract Required by Combat
 
-## Spacing model
+Inventory work must distinguish three states:
 
-The lane is discrete **range bands** from the player: `MELEE (0)`, `NEAR (1)`,
-`MID (2)`, `FAR (3)`. Every enemy sits in a band. Advancing shifts the field one
-band closer. Each enemy is **only dangerous, and only killable, in specific
-bands**:
+1. **Owned** — the item exists in the Pack.
+2. **Equipped to a stance or equipment slot** — the item is available to the
+   combat loadout.
+3. **Readied** — Q, W, or E is the stance currently active in the scene.
 
-- **Sword-enemy** — harmless at MID/FAR, lethal at MELEE. Weak to spear at NEAR,
-  so kill it before it closes.
-- **Spear-enemy** — dangerous at NEAR (thrust reach), safe to *finish* at MELEE
-  with a sword once softened. Walking past its thrust is the risk.
-- **Ranged-enemy** — dangerous at FAR/MID (firing), trivial at MELEE, but usually
-  sits *behind* the melee wall, so you can't reach it without solving the front.
+The Pack determines which items occupy Q, W, E, armor, and defensive slots.
+Combat reads that prepared loadout and does not silently make every owned weapon
+available. If a required stance has no valid equipped item, its combat control
+is unavailable. A safe unarmed fallback must prevent progression dead ends.
 
-This makes position tension automatic: advancing to finish one enemy pulls the
-others into worse ranges for you.
+Equipment cannot be rearranged from the Pack while a real-time combat scene is
+active. Switching Q/W/E only readies a prepared stance; it does not change the
+underlying inventory loadout.
 
-## Rows (vertical positioning)
+## Implementation Status
 
-The lane has 2–3 **rows**. Rules:
+Implemented in the first correct combat slice:
 
-- The equipped weapon **auto-attacks only the player's current row**. You can
-  fight one row at a time.
-- Row changes are **free and instant** — flicking between rows to service a
-  different threat costs nothing.
-- Enemies occupy **fixed rows** (only their distance changes as they advance),
-  so formations are authorable, readable puzzles.
+- Valid attacks happen automatically in `sceneCombatCore.js`.
+- Q/W/E replace the former four weapon hotkeys; repeating E cycles prepared
+  heavy-sword and spear styles.
+- Shared equipment and stance selectors live in `sceneCombatData.js`.
+- The readied weapon remains visible while a live encounter is in the scene.
+- Owned, equipped, and readied behavior is connected through the Pack and save
+  migration, with fists as the safe fallback.
+- Headless tests cover the Fox, Iron Shell, Wire Magpie, rewards, timing, and
+  save/resume behavior.
 
-The emergent game is **attention allocation**: while you service one row, the
-others' clocks keep ticking. Because row-swap is free but weapon-swap costs a
-beat, and each row may hold a different enemy type, optimal play is to **batch by
-weapon** — clear everything your current weapon counters across all rows, then
-pay the one switch cost and clear the next type. That is the sequencing puzzle in
-real time.
+The next pass should polish telegraphs, shield timing, cooldown feedback, and
+stance balance.
 
-## Enemy types
+## Resolved Decisions
 
-Read at a glance by **silhouette**, not detail:
+- Active architecture: horizontally walkable scene combat.
+- Player attacks: automatic when a valid target is in the readied weapon's
+  range and the weapon is ready.
+- Player decisions: advance, hold, retreat, choose Q/W/E, and time defense.
+- Stances: Q long-range two-handed, W one-handed pairing, E heavy two-handed.
+- Baseline Q item: slingshot with ammunition and lower damage.
+- Baseline W pairing: sword and shield with timed damage reduction.
+- Baseline E items: two-handed sword or spear with stronger offense and greater
+  exposure.
+- Presentation: the current weapon or pairing remains visible throughout combat.
+- Legacy arena combat: deprecated; no new work goes into it.
 
-- **Spear** — long horizontal reach. Slow. Lunges/thrusts.
-- **Sword** — compact, forward-leaning. Fast, closes distance.
-- **Ranged** — held-back/upright pose. Stays back, fires down the lane.
+## Open Tuning Questions
 
-Each shows a **clock** (reuse the old `enemyTelegraph` idea, per enemy): a count
-until its next action, so the player can read and plan against it.
-
-## Commitment
-
-Advance is a discrete, telegraphed action: it moves the player one band and
-takes a beat during which the player cannot attack — the formation's clocks tick
-while stepping. Retreat is possible but costs more beats than advancing, so
-backing out of a bad plan hurts (but never fully stalls the fight).
-
-## Active defense
-
-Defense is **positional + active**. Positioning (right range, right row, killing
-threats in order) is the primary layer, but the player also keeps an active
-**brace/parry** tool (reuse the old brace system): hold to guard, release to
-parry a telegraphed hit. This adds a reflex tool for when a plan goes wrong,
-without replacing the sequencing focus.
-
-## Failure model — forgiving
-
-A wrong sequence or a mistimed weapon switch does **not** cause instant loss. It
-just gives enemies **more time to advance and deal more chip damage.** This lets
-players learn matchups by experimenting. Reading puzzles want the forgiving end.
-
-## Difficulty curve
-
-Only **two knobs**: enemy count and type variety. They map onto the two skills.
-
-- **Tier 1 — one type, few enemies.** Teach a single matchup in isolation
-  (identity + spacing). No sequencing yet.
-- **Tier 2 — one type, many enemies.** Same matchup as a conveyor. Teach rhythm
-  and switch cost under volume.
-- **Tier 3 — two types mixed.** First real sequencing puzzle: two clocks, one
-  position, pick the order.
-- **Tier 4+ — all three, larger formations.** Full puzzle; count scales pressure.
-
-No stat inflation needed — count and variety carry the whole curve.
-
-## Worked example (the fun test)
-
-Formation from the player: **Sword-rusher at MID**, **Spear-guy at NEAR**,
-**Archer at FAR** (behind both).
-
-- Archer fires in 3 beats. Sword-rusher advances 1 band / 2 beats, lethal at
-  MELEE. Spear-guy thrusts anyone entering NEAR/MELEE from the front.
-
-*Naive solve* ("stab the closest, the spear-guy") fails: the medium spear
-switch-in lets the rusher close and the archer fire — you eat two hits.
-
-*Intended solve:* open **ranged** on the archer (kill the back clock before it
-fires) → switch **spear**, hold the rusher out at NEAR (spacer kills it) →
-switch **sword** (cheap swap) and advance to MELEE to finish the wounded
-spear-guy safely, since nothing is left to punish the step-in.
-
-If a formation has a clean solvable order like this — plus tempting-but-punishing
-alternatives — the design works. Encounter design = authoring such formations.
-
-## Migration notes (from current code)
-
-Reuse:
-- `getRangeBand` / `getGap` → generalize to per-enemy bands.
-- `enemyTelegraph` → per-enemy clocks (the thing the player reads).
-- Weapon slots + hotkeys + `setCombatWeapon` → keep, add switch-in cost.
-
-Replace:
-- Single-enemy state (`enemyHp`, `enemyX`, one telegraph) → `enemies: [...]`
-  each with type, band, hp, and clock.
-- `combatView.js` renders a scrolling slice of the wide lane instead of one duel.
-
-## Resolved decisions
-
-- Time: real-time, slow clocks (no pause on menus/swaps).
-- Attack: auto-attack whatever's in the equipped weapon's range.
-- Defense: positional + active brace/parry.
-- Lane: 2–3 fixed rows; weapon hits current row only; row-swap free/instant;
-  weapon-swap costs a beat.
-
-## Open questions (tuning / still to decide)
-
-- Exact beat/clock timings per enemy and weapon switch-in cost (tuning pass).
-- Retreat cost: fixed extra beats, or limited retreats per fight?
-- Does advancing move the player or pull the field? (Same math; pick for feel.)
-- Win condition: clear the formation, reach the lane's end, or a boss/objective?
-- Do enemies advance toward the player on their own, or only when the player
-  advances? (With real-time clocks, "advance on a timer" is the natural default.)
-- Ranged ammo economy: refill between fights, mid-lane pickups, or hard budget?
-- Weapon access: start with all three, or unlock across tiers?
-- Rewards: reuse the existing copper-bits economy (`fightBits`, rewards)?
+- Exact automatic attack cadence for each stance.
+- Whether switching stance resets, pauses, or preserves an attack cooldown.
+- Whether slingshot ammunition regenerates during combat, refills between
+  encounters, or comes from inventory.
+- Exact shield timing input and guard-resource behavior.
+- Whether W supports two offensive one-handed items as well as weapon/shield.
+- How the Pack selects between a two-handed sword and spear for E.
+- How much retreat is limited by enemy speed, scene boundaries, or recovery.
+- Whether an enemy already inside its attack range should continue tracking a
+  retreating player during its telegraph.

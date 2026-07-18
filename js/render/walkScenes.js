@@ -77,6 +77,22 @@ export const WALK_SCENES = {
       { id: "demo-shell", type: "ironShell", x: 64 },
     ],
   },
+  combatDemoMagpie: {
+    art: plains,
+    groundY: 22,
+    minX: 1,
+    maxX: 94,
+    next: null,
+    enemySpawns: [
+      {
+        id: "demo-magpie",
+        type: "wireMagpie",
+        x: 64,
+        lane: "highAir",
+        yOffset: -7,
+      },
+    ],
+  },
 };
 
 // How many scenes the player walks through in one run. With the plains/plains2

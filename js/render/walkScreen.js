@@ -8,6 +8,7 @@ import {
 } from "../asciiArtHelper.js";
 import { sceneEnemySprites } from "../asciiArt/sceneCombatSprites.js";
 import {
+  getSceneCombatStances,
   SCENE_COMBAT_TUNING,
   SCENE_ENEMY_TYPES,
   SCENE_WEAPONS,
@@ -18,9 +19,8 @@ import {
   installWalkKeyHandlers,
   moveWalk,
   releaseSceneBrace,
-  requestSceneAttack,
   restartSceneEncounter,
-  setSceneWeapon,
+  setSceneStance,
   startSceneBrace,
 } from "../actions.js";
 import { getSpriteWidth, placeSprite } from "./ascii.js";
@@ -34,13 +34,6 @@ const ENEMY_ART = {
   foxDead: darkTreeWatcherDeadArt,
 };
 
-const WEAPON_SLOTS = [
-  { key: "slingshot", hotkey: "Q" },
-  { key: "sword", hotkey: "W" },
-  { key: "heavySword", hotkey: "E" },
-  { key: "spear", hotkey: "R" },
-];
-
 function writeText(canvas, text, x, y) {
   if (y < 0 || y >= canvas.length) return;
   [...text].forEach((character, offset) => {
@@ -53,10 +46,8 @@ function writeText(canvas, text, x, y) {
 
 function getPlayerArt() {
   if (game.walk.bracing) return playerCombatPoses.brace;
-  if (game.walk.inCombat || game.walk.attackFrame > 0 || game.walk.recoveryTimer > 0) {
-    if (game.walk.equippedWeapon === "heavySword") {
-      return playerCombatPoses.sword;
-    }
+  const encounterIsArmed = game.walk.enemies.some((enemy) => enemy.hp > 0);
+  if (encounterIsArmed || game.walk.inCombat || game.walk.attackFrame > 0) {
     return playerCombatPoses[game.walk.equippedWeapon] ?? playerCombatArt;
   }
 
@@ -141,6 +132,7 @@ function gauge(current, maximum, width = 10) {
 
 function buildStatusText() {
   const weapon = SCENE_WEAPONS[game.walk.equippedWeapon];
+  const stats = getPlayerSceneCombatStats();
   const living = game.walk.enemies.filter((enemy) => enemy.hp > 0);
   const closest = living.sort((left, right) => {
     return Math.abs(left.x - game.walk.playerX) - Math.abs(right.x - game.walk.playerX);
@@ -152,14 +144,25 @@ function buildStatusText() {
 
   return [
     `YOU ${game.player.health}/${game.player.maxHealth}  ·  ${weapon.label}  ·  ${enemyStatus}`,
-    `AMMO ${game.walk.slingshotAmmo}/${SCENE_COMBAT_TUNING.ammoMax}  ·  GUARD ${gauge(game.walk.guard, SCENE_COMBAT_TUNING.guardMax)}  ·  BITS +${game.walk.bitsEarned}  ·  ${state}`,
+    `AMMO ${game.walk.slingshotAmmo}/${SCENE_COMBAT_TUNING.ammoMax}  ·  GUARD ${gauge(game.walk.guard, SCENE_COMBAT_TUNING.guardMax)}  ·  ARMOR -${stats.damageReduction}  ·  BITS +${game.walk.bitsEarned}  ·  ${state}`,
   ].join("\n");
 }
 
 function buildControlsHtml() {
-  const weaponButtons = WEAPON_SLOTS.map(({ key, hotkey }) => {
-    return `<span class="sceneWeaponButton asciiRealButton" data-scene-weapon="${key}">[${hotkey}] ${SCENE_WEAPONS[key].label}</span>`;
-  }).join("\n");
+  const stances = getSceneCombatStances(game.inventory, game.walk.demo);
+  const stanceButtons = stances
+    .map((stance) => {
+      const available = stance.weaponKeys.length > 0;
+      const styles = available
+        ? stance.weaponKeys.map((key) => SCENE_WEAPONS[key].label).join(" / ")
+        : "not equipped";
+      const unavailableClass = available ? "" : " combatUnowned";
+      return `<span class="sceneWeaponButton asciiRealButton${unavailableClass}" data-scene-stance="${stance.key}">[${stance.key.toUpperCase()}] ${stance.label}: ${styles}</span>`;
+    })
+    .join("\n");
+  const hasPreparedWeapon = stances.some((stance) => stance.weaponKeys.length > 0);
+  const fistsFallback = hasPreparedWeapon ? "" :
+    `<span class="sceneWeaponButton combatEquipped">[--] ${SCENE_WEAPONS.fists.label}</span>`;
 
   return `
     <div class="sceneControlGroup">
@@ -169,18 +172,17 @@ function buildControlsHtml() {
     </div>
     <div class="sceneControlGroup">
       <div class="combatControlLabel">WEAPON / STANCE</div>
-      ${weaponButtons}
+      ${stanceButtons}
+      ${fistsFallback}
     </div>
     <div class="sceneControlGroup">
       <div class="combatControlLabel">ACTION</div>
-      <span id="sceneAttackButton" class="asciiRealButton">[Space/Z] Attack</span>
       <span id="sceneBraceButton" class="asciiRealButton">[Shift] Hold shield / release to parry</span>
     </div>`;
 }
 
 function buildShell() {
-  mainContent.innerHTML = `
-    <div id="sceneCombatShell" data-scene-id="${escapeHtml(game.walk.sceneId)}">
+  mainContent.innerHTML = `<div id="sceneCombatShell" data-scene-id="${escapeHtml(game.walk.sceneId)}">
       <pre id="sceneArena"></pre>
       <pre id="sceneStatus"></pre>
       <div id="sceneCombatLog" class="combatLog"></div>
@@ -189,7 +191,7 @@ function buildShell() {
         <span id="restartSceneButton" class="asciiRealButton hidden">Heal and fight again</span>
         <span id="leaveWalkButton" class="asciiRealButton">Return</span>
       </div>
-      <p class="sceneControlHint">Arrows move · Q/W/E/R change equipment · Space or Z attacks · hold Shift to block, release during [!] to parry.</p>
+      <p class="sceneControlHint">Arrows move · Q/W/E ready a stance · attacks are automatic in range · hold Shift to block, release during [!] to parry.</p>
     </div>`;
 
   document.querySelectorAll("[data-walk-direction]").forEach((button) => {
@@ -197,12 +199,11 @@ function buildShell() {
       moveWalk(Number(button.dataset.walkDirection));
     });
   });
-  document.querySelectorAll("[data-scene-weapon]").forEach((button) => {
+  document.querySelectorAll("[data-scene-stance]").forEach((button) => {
     button.addEventListener("click", () => {
-      setSceneWeapon(button.dataset.sceneWeapon);
+      setSceneStance(button.dataset.sceneStance);
     });
   });
-  document.getElementById("sceneAttackButton").addEventListener("click", requestSceneAttack);
 
   const braceButton = document.getElementById("sceneBraceButton");
   braceButton.addEventListener("mousedown", startSceneBrace);
@@ -229,12 +230,15 @@ function updateLog() {
 }
 
 function updateControls() {
-  const stats = getPlayerSceneCombatStats();
-  document.querySelectorAll("[data-scene-weapon]").forEach((button) => {
-    const key = button.dataset.sceneWeapon;
-    const owned = stats.weapons.includes(key);
-    button.classList.toggle("combatEquipped", game.walk.equippedWeapon === key);
-    button.classList.toggle("combatUnowned", !owned);
+  const stances = getSceneCombatStances(game.inventory, game.walk.demo);
+  document.querySelectorAll("[data-scene-stance]").forEach((button) => {
+    const stance = stances.find(
+      (candidate) => candidate.key === button.dataset.sceneStance,
+    );
+    button.classList.toggle(
+      "combatEquipped",
+      Boolean(stance?.weaponKeys.includes(game.walk.equippedWeapon)),
+    );
   });
 
   const currentWeapon = SCENE_WEAPONS[game.walk.equippedWeapon];

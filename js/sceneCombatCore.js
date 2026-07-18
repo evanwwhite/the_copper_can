@@ -180,10 +180,7 @@ function findAttackTarget(sceneState, weapon) {
     })[0] ?? null;
 }
 
-function startPlayerAttack(sceneState, playerStats, random) {
-  if (!sceneState.attackRequested) return;
-  sceneState.attackRequested = false;
-
+function startAutomaticPlayerAttack(sceneState, playerStats, random) {
   if (
     sceneState.phase === "defeat" ||
     sceneState.bracing ||
@@ -200,8 +197,10 @@ function startPlayerAttack(sceneState, playerStats, random) {
   const weapon = SCENE_WEAPONS[weaponKey];
   if (!weapon) return;
 
+  const target = findAttackTarget(sceneState, weapon);
+  if (!target) return;
+
   if (weapon.projectile && sceneState.slingshotAmmo <= 0) {
-    pushSceneLog(sceneState, "The slingshot is out of rivets.", "info");
     return;
   }
 
@@ -209,8 +208,6 @@ function startPlayerAttack(sceneState, playerStats, random) {
   sceneState.attackCooldown = weapon.cooldownTicks;
   sceneState.recoveryTimer = weapon.recoveryTicks;
   sceneState.attackFrame = Math.max(2, Math.ceil(weapon.recoveryTicks / 2));
-
-  const target = findAttackTarget(sceneState, weapon);
 
   if (weapon.projectile) {
     sceneState.slingshotAmmo -= 1;
@@ -220,18 +217,13 @@ function startPlayerAttack(sceneState, playerStats, random) {
       x: sceneState.playerX + sceneState.facing * 3,
       originX: sceneState.playerX,
       direction: sceneState.facing,
-      lane: target?.lane ?? "ground",
-      yOffset: target?.yOffset ?? 0,
+      lane: target.lane,
+      yOffset: target.yOffset,
       speed: weapon.projectileSpeed,
       maxDistance: weapon.maxRange,
       weaponKey,
     });
     pushSceneLog(sceneState, "A rivet snaps away from the slingshot.", "info");
-    return;
-  }
-
-  if (!target) {
-    pushSceneLog(sceneState, `${weapon.label} cuts through empty air.`, "info");
     return;
   }
 
@@ -289,7 +281,7 @@ function canShield(sceneState, playerStats) {
 function resolveParries(sceneState, playerStats) {
   if (!sceneState.releasedBrace) return;
   sceneState.releasedBrace = false;
-  if (!playerStats.hasShield) return;
+  if (!canShield(sceneState, playerStats)) return;
 
   let parried = 0;
   sceneState.enemies.forEach((enemy) => {
@@ -549,7 +541,7 @@ export function stepSceneCombat(
   updateResourcesAndTimers(sceneState, playerStats);
   resolveParries(sceneState, playerStats);
   updatePlayerMovement(sceneState, playerStats);
-  startPlayerAttack(sceneState, playerStats, random);
+  startAutomaticPlayerAttack(sceneState, playerStats, random);
   updateProjectiles(sceneState, random);
   sceneState.enemies.forEach((enemy) => updateEnemy(sceneState, enemy, playerStats));
 

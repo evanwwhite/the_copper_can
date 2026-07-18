@@ -166,13 +166,13 @@ export function renderTopBar() {
 
   const healthLine = `│${healthPrefix}${healthBar}${healthSuffix}│`;
 
-  statusBar.innerHTML = `
-${topBorder}
-${buttonLine}
-${buttonDivider}
-${healthLine}
-${bottomBorder}
-`;
+  statusBar.innerHTML = [
+    topBorder,
+    buttonLine,
+    buttonDivider,
+    healthLine,
+    bottomBorder,
+  ].join("\n");
 }
 
 export function attachTopBarListeners() {

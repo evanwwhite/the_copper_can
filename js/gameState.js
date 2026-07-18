@@ -58,7 +58,6 @@ export function createWalkState() {
     projectiles: [],
     effects: [],
     equippedWeapon: "sword",
-    attackRequested: false,
     attackCooldown: 0,
     attackFrame: 0,
     recoveryTimer: 0,
@@ -87,7 +86,7 @@ export function createWalkState() {
   };
 }
 
-export const SAVE_VERSION = 3;
+export const SAVE_VERSION = 4;
 
 export function createInitialGameState() {
   return {
@@ -119,10 +118,10 @@ export function createInitialGameState() {
       boots: false,
       sword: false,
       spear: false,
-      shield: false,
       slingshotEquipped: false,
       bootsEquipped: false,
       swordEquipped: false,
+      spearEquipped: false,
       bentMagnetBitsPerSecond: 1,
     },
 

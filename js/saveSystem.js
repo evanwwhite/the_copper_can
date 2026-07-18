@@ -6,6 +6,10 @@ import {
   SAVE_VERSION,
 } from "./gameState.js";
 import { LEGACY_SAVE_KEYS, SAVE_KEY } from "./data.js";
+import {
+  EQUIPMENT_ITEM_KEYS,
+  getAvailableSceneWeapons,
+} from "./sceneCombatData.js";
 
 const SAVE_GROUP_KEYS = [
   "world",
@@ -139,12 +143,27 @@ export function hydrateGameState(saveData = {}) {
   // Saves made before equippable gear existed have no *Equipped flags. Default
   // each to whether the item is owned so existing gear keeps working in combat.
   const rawInventory = migratedSaveData.inventory ?? {};
-  ["slingshot", "boots", "sword", "spear"].forEach((itemKey) => {
+  EQUIPMENT_ITEM_KEYS.forEach((itemKey) => {
     const equippedKey = `${itemKey}Equipped`;
     if (rawInventory[equippedKey] === undefined) {
       hydratedState.inventory[equippedKey] = hydratedState.inventory[itemKey];
     }
   });
+
+  // The Copper Can lid is the baseline defensive item. Remove the abandoned
+  // standalone shield flag from older saves so there is only one shield rule.
+  delete hydratedState.inventory.shield;
+
+  // An older save may resume in a scene with a weapon that is owned but no
+  // longer equipped under the new contract. Ready a valid loadout style, or
+  // fists when the player has no equipped weapon.
+  const availableSceneWeapons = getAvailableSceneWeapons(
+    hydratedState.inventory,
+    hydratedState.walk.demo,
+  );
+  if (!availableSceneWeapons.includes(hydratedState.walk.equippedWeapon)) {
+    hydratedState.walk.equippedWeapon = availableSceneWeapons[0];
+  }
 
   return hydratedState;
 }

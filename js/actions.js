@@ -21,7 +21,11 @@ import {
   stepSceneCombat,
 } from "./sceneCombatCore.js";
 import {
+  EQUIPMENT_DEFINITIONS,
   getAvailableSceneWeapons,
+  getEquippedItemKeys,
+  getSceneCombatStances,
+  isEquipmentEquipped,
   SCENE_TICK_MS,
   SCENE_WEAPONS,
 } from "./sceneCombatData.js";
@@ -94,16 +98,20 @@ export function getPlayerCombatStats() {
   // The demo arena lends the full kit so the beta is testable before the
   // player has bought anything.
   const demo = game.combat.demo;
-  const weapons = ["slingshot", "spear", "sword"].filter(
-    (key) => demo || game.inventory[key],
-  );
+  const weapons = demo
+    ? ["slingshot", "spear", "sword"]
+    : getEquippedItemKeys(game.inventory, "weapon");
 
   return {
     health: game.player.health,
     maxHealth: game.player.maxHealth,
     weapons,
-    hasShield: demo || game.inventory.shield,
-    damageReduction: game.inventory.bootsEquipped ? BOOTS_DAMAGE_REDUCTION : 0,
+    // The Copper Can lid is the baseline shield. Stance rules determine when
+    // the player's current grip leaves a hand free to use it.
+    hasShield: true,
+    damageReduction: isEquipmentEquipped(game.inventory, "boots")
+      ? BOOTS_DAMAGE_REDUCTION
+      : 0,
   };
 }
 
@@ -348,6 +356,8 @@ export async function enterWalkScene(sceneId = "plains", segment = 1, overrides 
 }
 
 export function getPlayerSceneCombatStats() {
+  const hasCombatBoots = game.walk.demo ||
+    isEquipmentEquipped(game.inventory, "boots");
   return {
     health: game.player.health,
     maxHealth: game.player.maxHealth,
@@ -355,16 +365,13 @@ export function getPlayerSceneCombatStats() {
     // The can's lid is the baseline shield. Weapon definitions determine
     // whether the current grip leaves a hand free to use it.
     hasShield: true,
-    damageReduction: game.inventory.bootsEquipped ? BOOTS_DAMAGE_REDUCTION : 0,
+    damageReduction: hasCombatBoots
+      ? BOOTS_DAMAGE_REDUCTION
+      : 0,
   };
 }
 
-export const SCENE_WEAPON_KEYS = {
-  q: "slingshot",
-  w: "sword",
-  e: "heavySword",
-  r: "spear",
-};
+export const SCENE_STANCE_KEYS = { q: "q", w: "w", e: "e" };
 
 export function setSceneWeapon(weaponKey) {
   if (!game.walk.active || game.walk.phase === "defeat") return;
@@ -381,9 +388,17 @@ export function setSceneWeapon(weaponKey) {
   );
 }
 
-export function requestSceneAttack() {
+export function setSceneStance(stanceKey) {
   if (!game.walk.active || game.walk.phase === "defeat") return;
-  game.walk.attackRequested = true;
+  const stance = getSceneCombatStances(game.inventory, game.walk.demo)
+    .find((candidate) => candidate.key === stanceKey);
+  if (!stance || stance.weaponKeys.length === 0) return;
+
+  const currentIndex = stance.weaponKeys.indexOf(game.walk.equippedWeapon);
+  const nextIndex = currentIndex >= 0
+    ? (currentIndex + 1) % stance.weaponKeys.length
+    : 0;
+  setSceneWeapon(stance.weaponKeys[nextIndex]);
 }
 
 export function startSceneBrace() {
@@ -490,10 +505,8 @@ export function installWalkKeyHandlers() {
     if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
       game.walk.heldDir = event.key === "ArrowLeft" ? -1 : 1;
       game.walk.facing = game.walk.heldDir;
-    } else if (SCENE_WEAPON_KEYS[key]) {
-      setSceneWeapon(SCENE_WEAPON_KEYS[key]);
-    } else if ((event.code === "Space" || key === "z") && !event.repeat) {
-      requestSceneAttack();
+    } else if (SCENE_STANCE_KEYS[key] && !event.repeat) {
+      setSceneStance(SCENE_STANCE_KEYS[key]);
     } else if (key === "shift" && !event.repeat) {
       startSceneBrace();
     } else {
@@ -969,7 +982,9 @@ export async function startCombatDemo(enemyId = "darkTreeWatcher") {
   if (game.walk.active) return;
   const sceneId = enemyId === "boneRattle"
     ? "combatDemoSkeleton"
-    : "combatDemoFox";
+    : enemyId === "wireMagpie"
+      ? "combatDemoMagpie"
+      : "combatDemoFox";
 
   await enterWalkScene(sceneId, 1, {
     returnScreen: "game",
@@ -1033,22 +1048,21 @@ export async function exitCombatDemo() {
   await renderGame();
 }
 
-const EQUIPPABLE_ITEMS = {
-  slingshot: "slingshot",
-  boots: "boots",
-  sword: "sword",
-  spear: "spear",
-};
-
 export async function toggleEquip(itemKey) {
-  if (!EQUIPPABLE_ITEMS[itemKey]) return;
+  if (!EQUIPMENT_DEFINITIONS[itemKey]) return;
   if (!game.inventory[itemKey]) return;
+  if (
+    game.combat.active ||
+    (game.world.screen === "walk" && game.walk.active)
+  ) {
+    return;
+  }
 
   const equippedKey = `${itemKey}Equipped`;
   const nowEquipped = !game.inventory[equippedKey];
   game.inventory[equippedKey] = nowEquipped;
 
-  const label = itemKey.charAt(0).toUpperCase() + itemKey.slice(1);
+  const label = EQUIPMENT_DEFINITIONS[itemKey].label;
   game.lastMessage = nowEquipped
     ? `${label} equipped.`
     : `${label} unequipped.`;

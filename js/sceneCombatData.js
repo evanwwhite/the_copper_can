@@ -14,6 +14,40 @@ export const SCENE_COMBAT_TUNING = {
   logCap: 80,
 };
 
+// Equipment contract shared by the Pack, save migration, and combat. Ownership
+// and loadout are intentionally separate: owning an item puts it in the Pack;
+// its *Equipped flag determines whether combat may use its effect or styles.
+export const EQUIPMENT_DEFINITIONS = {
+  slingshot: { label: "Slingshot", slot: "weapon" },
+  sword: { label: "Sword", slot: "weapon" },
+  spear: { label: "Spear", slot: "weapon" },
+  boots: { label: "Boots", slot: "legs" },
+};
+
+export const EQUIPMENT_ITEM_KEYS = Object.freeze(
+  Object.keys(EQUIPMENT_DEFINITIONS),
+);
+
+export function ownsEquipment(inventory, itemKey) {
+  return Boolean(EQUIPMENT_DEFINITIONS[itemKey] && inventory?.[itemKey]);
+}
+
+export function isEquipmentEquipped(inventory, itemKey) {
+  return Boolean(
+    ownsEquipment(inventory, itemKey) && inventory?.[`${itemKey}Equipped`],
+  );
+}
+
+export function getEquippedItemKeys(inventory, slot = null) {
+  return EQUIPMENT_ITEM_KEYS.filter((itemKey) => {
+    const definition = EQUIPMENT_DEFINITIONS[itemKey];
+    return (
+      (!slot || definition.slot === slot) &&
+      isEquipmentEquipped(inventory, itemKey)
+    );
+  });
+}
+
 // A heavy sword is a two-handed stance for the regular sword, so buying one
 // blade unlocks both the one-handed sword and heavy-sword combat styles.
 export const SCENE_WEAPONS = {
@@ -39,7 +73,7 @@ export const SCENE_WEAPONS = {
     maxRange: 80,
     cooldownTicks: 6,
     recoveryTicks: 2,
-    canUseShield: true,
+    canUseShield: false,
     projectile: true,
     projectileSpeed: 4,
     knockback: 0,
@@ -220,8 +254,30 @@ export const SCENE_ENEMY_TYPES = {
 
 export function getAvailableSceneWeapons(inventory, demo = false) {
   const available = Object.entries(SCENE_WEAPONS)
-    .filter(([key, weapon]) => key !== "fists" && (demo || inventory[weapon.ownedBy]))
+    .filter(
+      ([key, weapon]) =>
+        key !== "fists" &&
+        (demo || isEquipmentEquipped(inventory, weapon.ownedBy)),
+    )
     .map(([key]) => key);
 
   return available.length > 0 ? available : ["fists"];
+}
+
+// Q/W/E are stance controls. A stance may expose more than one prepared style;
+// pressing that stance repeatedly cycles its available styles. This lets E
+// contain both an equipped heavy sword and spear without adding a fourth key.
+export function getSceneCombatStances(inventory, demo = false) {
+  const available = new Set(getAvailableSceneWeapons(inventory, demo));
+  const makeStance = (key, label, weaponKeys) => ({
+    key,
+    label,
+    weaponKeys: weaponKeys.filter((weaponKey) => available.has(weaponKey)),
+  });
+
+  return [
+    makeStance("q", "Long range", ["slingshot"]),
+    makeStance("w", "One-handed", ["sword"]),
+    makeStance("e", "Heavy two-handed", ["heavySword", "spear"]),
+  ];
 }

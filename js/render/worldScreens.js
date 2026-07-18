@@ -441,8 +441,7 @@ export function renderWorldSceneView(viewName) {
     ? "Return to House by the Beach"
     : "Return to World Map";
 
-  mainContent.innerHTML = `
-${regions
+  mainContent.innerHTML = `${regions
   ? buildHoverScene(sceneArt, regions, "worldScene", "worldMapScene")
   : sceneArt}
 

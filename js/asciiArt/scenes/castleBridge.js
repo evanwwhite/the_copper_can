@@ -1,4 +1,4 @@
-export const castleBridge = String.raw`
+export const castleBridge = String.raw`            
                ( (    ))(    ))                                                                     
                 '-(__.''-(__.'                                                                      
                                                                      __                             
