@@ -6,7 +6,7 @@ import {
   villageHallBase,
   villageShopInterior,
 } from "../asciiArt/scenes/interiorScenes.js";
-import { makeBox } from "../helpers.js";
+import { makeBox, makeMessageBox } from "../helpers.js";
 import {
   BOOTS_COST,
   INN_REST_COST,
@@ -43,6 +43,10 @@ const TOWN_LOCKED_MESSAGE =
   "The doors are barred. While the fox prowls the far bank, the village " +
   "has locked every shop and shuttered the inn. Drive the fox off and they " +
   "will open again.";
+
+// The interior scenes are 80 characters wide. A 74-character text area plus
+// the frame and padding aligns the dialogue panel with the scene above it.
+const INTERIOR_PANEL_WIDTH = 74;
 
 function isBuildingLocked(id) {
   return (
@@ -306,44 +310,6 @@ function attachTownHoverListeners() {
   });
 }
 
-// Interior room art lives as baked literals in js/asciiArt/scenes/interiorScenes.js.
-// Regenerate them with: bun scripts/bakeScenes.mjs emit
-function placeInteriorLines(canvas, lines, x, y) {
-  lines.forEach((line, rowOffset) => {
-    [...line].forEach((character, columnOffset) => {
-      const rowIndex = y + rowOffset;
-      const columnIndex = x + columnOffset;
-
-      if (
-        rowIndex < 0 ||
-        rowIndex >= canvas.length ||
-        columnIndex < 0 ||
-        columnIndex >= canvas[0].length
-      ) {
-        return;
-      }
-
-      canvas[rowIndex][columnIndex] = character;
-    });
-  });
-}
-
-function buildVillageHallInteriorLines(dialogueStep = 0) {
-  const canvas = villageHallBase.split("\n").map(line => [...line]);
-  const villageHallDialogue = getVillageHallDialogue();
-  const dialogueLines =
-    villageHallDialogue[dialogueStep] ??
-    villageHallDialogue[villageHallDialogue.length - 1];
-  const speechBox = makeBox("VILLAGER", dialogueLines, 33).split("\n");
-
-  // Anchor the speech box to the bottom of the room so it doesn't obstruct the
-  // throne/dais. Its bottom border sits one row above the room's bottom border.
-  const speechBoxTop = canvas.length - 1 - speechBox.length;
-  placeInteriorLines(canvas, speechBox, 28, speechBoxTop);
-
-  return canvas.map(row => row.join("")).join("\n");
-}
-
 function buildRiversideInnInteriorLines() {
   return riversideInnInterior;
 }
@@ -356,16 +322,14 @@ function buildBlacksmithInteriorLines() {
   return blacksmithInterior;
 }
 
-function getTownInteriorScene(buildingId, dialogueStep = 0) {
-  if (buildingId === "villageHall") {
-    return buildVillageHallInteriorLines(dialogueStep);
-  }
+function getTownInteriorScene(buildingId) {
+  if (buildingId === "villageHall") return villageHallBase;
 
   if (buildingId === "riversideInn") return buildRiversideInnInteriorLines();
   if (buildingId === "villageShop") return buildVillageShopInteriorLines();
   if (buildingId === "blacksmith") return buildBlacksmithInteriorLines();
 
-  return buildVillageHallInteriorLines(dialogueStep);
+  return villageHallBase;
 }
 
 function makeBuyButton(id, label, cost, owned) {
@@ -425,7 +389,7 @@ export function renderTownScreen() {
 
   const townMessage =
     game.lastMessage !== ""
-      ? `\n\n${makeBox("MESSAGE", [game.lastMessage])}\n`
+      ? `\n\n${makeMessageBox(game.lastMessage)}\n`
       : "";
 
   renderTopBar();
@@ -465,13 +429,21 @@ export function renderTownInteriorScreen(villageHallDialogueStep = 0) {
 
   const interiorMessage =
     !isVillageHall && game.lastMessage !== ""
-      ? `\n${makeBox("MESSAGE", [game.lastMessage])}\n\n`
+      ? `\n${makeMessageBox(game.lastMessage, INTERIOR_PANEL_WIDTH)}\n\n`
       : "";
+  const dialogueLines = isVillageHall
+    ? villageHallDialogue[villageHallDialogueStep] ??
+      villageHallDialogue[villageHallDialogue.length - 1]
+    : [];
+  const dialoguePanel = isVillageHall
+    ? `\n${makeBox("VILLAGER", dialogueLines, INTERIOR_PANEL_WIDTH)}\n`
+    : "";
 
   renderTopBar();
   mainContent.innerHTML = `
-${getTownInteriorScene(game.world.currentView, villageHallDialogueStep)}
+${getTownInteriorScene(game.world.currentView)}
 
+${dialoguePanel}
 ${interiorMessage}
 ${interiorButtons}
 `;

@@ -23,6 +23,11 @@ import {
   setSceneStance,
   startSceneBrace,
 } from "../actions.js";
+import {
+  formatBoxLine,
+  makeBoxFrame,
+  wrapText,
+} from "../helpers.js";
 import { getSpriteWidth, placeSprite } from "./ascii.js";
 import { escapeHtml, mainContent, setMainContentMode } from "./dom.js";
 import { attachTopBarListeners, renderTopBar } from "./topBar.js";
@@ -33,6 +38,10 @@ const ENEMY_ART = {
   fox: darkTreeWatcherArt,
   foxDead: darkTreeWatcherDeadArt,
 };
+
+// Walk scenes are 100 characters wide. The text area plus its padding and
+// border is also 100 characters, keeping narration aligned below the artwork.
+const COMBAT_PANEL_WIDTH = 94;
 
 function writeText(canvas, text, x, y) {
   if (y < 0 || y >= canvas.length) return;
@@ -182,10 +191,16 @@ function buildControlsHtml() {
 }
 
 function buildShell() {
+  const combatFrame = makeBoxFrame("COMBAT", COMBAT_PANEL_WIDTH);
+
   mainContent.innerHTML = `<div id="sceneCombatShell" data-scene-id="${escapeHtml(game.walk.sceneId)}">
       <pre id="sceneArena"></pre>
+      <div class="textPanel combatTextPanel">
+        <pre class="textPanelFrame">${combatFrame.header}</pre>
+        <div id="sceneCombatLog" class="combatLog textPanelBody" role="log" aria-live="polite" aria-label="Combat messages"></div>
+        <pre class="textPanelFrame">${combatFrame.footer}</pre>
+      </div>
       <pre id="sceneStatus"></pre>
-      <div id="sceneCombatLog" class="combatLog"></div>
       <div id="sceneControls">${buildControlsHtml()}</div>
       <div id="sceneEndControls">
         <span id="restartSceneButton" class="asciiRealButton hidden">Heal and fight again</span>
@@ -221,9 +236,19 @@ function buildShell() {
 
 function updateLog() {
   const log = document.getElementById("sceneCombatLog");
-  log.innerHTML = game.walk.log
-    .map((entry) => {
-      return `<div class="combatLogLine combatLog-${entry.kind}">${escapeHtml(entry.text)}</div>`;
+  const entries = game.walk.log.length > 0
+    ? game.walk.log
+    : [{ text: "The road is quiet.", kind: "info" }];
+
+  log.innerHTML = entries
+    .flatMap((entry) => {
+      return wrapText(entry.text, COMBAT_PANEL_WIDTH).map((line) => {
+        const formattedLine = formatBoxLine(line, COMBAT_PANEL_WIDTH);
+        const prefix = formattedLine.slice(0, 3);
+        const suffix = formattedLine.slice(3 + line.length);
+
+        return `<div class="combatLogLine">${prefix}<span class="combatLog-${entry.kind}">${escapeHtml(line)}</span>${suffix}</div>`;
+      });
     })
     .join("");
   log.scrollTop = log.scrollHeight;

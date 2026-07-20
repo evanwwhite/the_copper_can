@@ -312,8 +312,10 @@ function clearWalkTimer() {
 // map) resets it to 1, while edge transitions carry the incremented count.
 export async function enterWalkScene(sceneId = "plains", segment = 1, overrides = {}) {
   const scene = await loadWalkScene(sceneId);
-  const previousDefeated = game.walk.defeatedSpawnIds ?? {};
-  const defeatedSpawnIds = { ...previousDefeated };
+  // Defeated spawn IDs are scoped to the current visit. Starting a scene
+  // again creates a fresh encounter, while story flags can still permanently
+  // suppress one-off enemies such as the dark-forest watcher.
+  const defeatedSpawnIds = {};
   const availableSpawns = (scene.enemySpawns ?? []).filter((spawn) => {
     return !spawn.storyFlag || !game.flags[spawn.storyFlag];
   });
@@ -333,10 +335,7 @@ export async function enterWalkScene(sceneId = "plains", segment = 1, overrides 
     equippedWeapon: weapons.includes(previousWeapon)
       ? previousWeapon
       : weapons[0],
-    enemies: createSceneEnemies(
-      availableSpawns,
-      overrides.demo ? {} : defeatedSpawnIds,
-    ),
+    enemies: createSceneEnemies(availableSpawns, defeatedSpawnIds),
     defeatedSpawnIds,
     demo: Boolean(overrides.demo),
     returnScreen: overrides.returnScreen ?? "game",

@@ -6,7 +6,7 @@ import {
   MAP_UNLOCK_AMOUNT,
 } from "../data.js";
 import { copperCan } from "../asciiArt/titles.js";
-import { makeBox } from "../helpers.js";
+import { makeBox, makeMessageBox } from "../helpers.js";
 import {
   buyBentMagnet,
   buyFreeWill,
@@ -200,7 +200,7 @@ ${makeBox("SOMETHING MOVES", [
 
   if (game.lastMessage !== "") {
     content += `
-${makeBox("MESSAGE", [game.lastMessage])}
+${makeMessageBox(game.lastMessage)}
 
 `;
   }

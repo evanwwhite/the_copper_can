@@ -18,4 +18,10 @@ export const sceneEnemySprites = {
     "  /~~\\  ",
   ],
   wireMagpieDead: ["  _x_  ", "<_/ \\_>"],
+  bat: [
+    '<">',
+  ],
+  batDead: [
+    ',,,'
+  ]
 };

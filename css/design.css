@@ -178,6 +178,27 @@ pre {
   white-space: pre-wrap;
 }
 
+.textPanel {
+  display: inline-block;
+  margin: 2px 0 6px;
+  background-color: #fbfaf8;
+}
+
+.textPanelFrame {
+  margin: 0 !important;
+}
+
+.textPanelBody {
+  border: 0;
+  max-height: 6em; /* five visible rows; older events remain scrollable */
+  margin: 0;
+  padding: 0;
+}
+
+.textPanelBody .combatLogLine {
+  white-space: pre;
+}
+
 .combatLog-crit,
 .combatLog-reward {
   font-weight: bold;

@@ -14,7 +14,20 @@ export function centerText(text, width) {
 }
 
 export function formatBoxLine(text, width = BOX_TEXT_WIDTH) {
-  return `│  ${String(text).padEnd(width, " ")}  │`;
+  return `|  ${String(text).padEnd(width, " ")}  |`;
+}
+
+export function makeBoxFrame(title, width = BOX_TEXT_WIDTH) {
+  const border = `+${repeatChar("-", width + 4)}+`;
+
+  return {
+    header: [
+      border,
+      formatBoxLine(centerText(title, width), width),
+      border,
+    ].join("\n"),
+    footer: border,
+  };
 }
 
 export function wrapText(text, width = BOX_TEXT_WIDTH) {
@@ -63,33 +76,27 @@ export function wrapText(text, width = BOX_TEXT_WIDTH) {
 }
 
 export function makeBox(title, lines = [], width = BOX_TEXT_WIDTH) {
-  const borderWidth = width + 4;
-  const topBorder = `┌${repeatChar("─", borderWidth)}┐`;
-  const divider = `├${repeatChar("─", borderWidth)}┤`;
-  const bottomBorder = `└${repeatChar("─", borderWidth)}┘`;
-
+  const frame = makeBoxFrame(title, width);
   const bodyLines = lines.flatMap(line => wrapText(line, width));
 
   return [
-    topBorder,
-    formatBoxLine(centerText(title, width), width),
-    divider,
+    frame.header,
     ...bodyLines.map(line => formatBoxLine(line, width)),
-    bottomBorder,
+    frame.footer,
   ].join("\n");
 }
 
+export function makeMessageBox(message, width = BOX_TEXT_WIDTH) {
+  if (message === "") return "";
+  return makeBox("MESSAGE", [message], width);
+}
+
 export function makePreformattedBox(title, lines = [], width = BOX_TEXT_WIDTH) {
-  const borderWidth = width + 4;
-  const topBorder = `┌${repeatChar("─", borderWidth)}┐`;
-  const divider = `├${repeatChar("─", borderWidth)}┤`;
-  const bottomBorder = `└${repeatChar("─", borderWidth)}┘`;
+  const frame = makeBoxFrame(title, width);
 
   return [
-    topBorder,
-    formatBoxLine(centerText(title, width), width),
-    divider,
+    frame.header,
     ...lines.map(line => formatBoxLine(line, width)),
-    bottomBorder,
+    frame.footer,
   ].join("\n");
 }
