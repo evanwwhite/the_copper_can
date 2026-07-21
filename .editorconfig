@@ -1,0 +1,13 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+
+[js/asciiArt/**]
+trim_trailing_whitespace = false
+
+[backupFolder/**]
+trim_trailing_whitespace = false
+

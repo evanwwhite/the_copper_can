@@ -23,5 +23,20 @@ export const sceneEnemySprites = {
   ],
   batDead: [
     ',,,'
+  ],
+  babyDodongo: [
+   " ∞~^~^'-,_,",
+   "Σ_/≤~^≤^~^'",
+  ],
+  babyDodongoDead: [
+      "≤∞~^^~^-,_",
+  ],
+  chuchu: [
+  "  __  ",  
+  " (∞)) ",  
+  "(___))_.",
+  ],
+  chuchuDead: [
+    "((__))",
   ]
 };

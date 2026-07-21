@@ -1,0 +1,4 @@
+# Do not silently normalize spacing-sensitive artwork or archival snapshots.
+js/asciiArt/** -text
+backupFolder/** -text
+

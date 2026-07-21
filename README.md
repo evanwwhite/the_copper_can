@@ -231,6 +231,22 @@ This is useful after refactors because it catches missing exports/imports across
 6. Keep ASCII assets in `js/asciiArt/` and re-export public assets through `js/asciiArtHelper.js`.
 7. Use `makePreformattedBox()` for spacing-sensitive diagrams such as maps.
 8. Use grouped state helpers in `gameState.js` and `saveSystem.js` for defaults, saves, and legacy migration.
+9. Treat every ASCII asset—including unused, commented, duplicate, unfinished,
+   experimental, and legacy art—as protected project content. Read
+   `js/asciiArt/README.md` before cleanup, conversion, or file removal.
+10. Validate protected art before committing with
+    `node scripts/ascii-assets.mjs --check`. After an intentional, visually
+    verified art change, refresh its inventory and byte manifest with `--update`.
+
+## Stabilization Cleanup Rule
+
+The ASCII Asset Preservation Policy overrides any cleanup instruction that
+would classify artwork as dead solely because it is unused. During combat
+isolation, action-layer refactoring, asset standardization, and final cleanup,
+inspect complete files and extract artwork before removing obsolete executable
+logic. Unknown material is preserved until manually reviewed. Format conversion
+must keep the original version until row lengths, backslashes, trailing spaces,
+Unicode rendering, and interactive coordinates have been verified.
 
 ## Current Source Of Truth
 

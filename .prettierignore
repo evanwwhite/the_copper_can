@@ -1,0 +1,4 @@
+# ASCII art is spacing-sensitive and must be reviewed asset by asset.
+js/asciiArt/**
+backupFolder/**
+
